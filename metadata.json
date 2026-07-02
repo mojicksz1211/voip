@@ -1,0 +1,10 @@
+{
+  "name": "Hotel Local VoIP Intercom",
+  "description": "A user-friendly hotel guest tablet and front desk intercom system that simulates SIP protocol communication over an offline-friendly local network server.",
+  "requestFramePermissions": [
+    "microphone"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

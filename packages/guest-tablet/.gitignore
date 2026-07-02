@@ -1,0 +1,9 @@
+# Capacitor / Android
+android/
+.capacitor/
+*.apk
+*.aab
+
+# Env
+.env
+.env.local

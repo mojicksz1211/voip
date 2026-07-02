@@ -1,0 +1,27 @@
+{
+  "name": "hotel-local-voip-intercom",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "concurrently -n server,guest,desk -c blue,green,yellow \"npm run dev -w @hotel-voip/pbx-server\" \"npm run dev -w @hotel-voip/guest-tablet\" \"npm run dev -w @hotel-voip/front-desk\"",
+    "dev:desk": "concurrently -n server,desk -c blue,yellow \"npm run dev -w @hotel-voip/pbx-server\" \"npm run dev -w @hotel-voip/front-desk\"",
+    "dev:all": "concurrently -n livekit,server,guest,desk -c magenta,blue,green,yellow \"npm run livekit\" \"npm run dev -w @hotel-voip/pbx-server\" \"npm run dev -w @hotel-voip/guest-tablet\" \"npm run dev -w @hotel-voip/front-desk\"",
+    "livekit": "node scripts/livekit.mjs",
+    "livekit:docker": "docker compose up livekit",
+    "build": "npm run build -w @hotel-voip/guest-tablet && npm run build -w @hotel-voip/front-desk && npm run build -w @hotel-voip/pbx-server",
+    "build:guest-apk": "npm run apk:debug -w @hotel-voip/guest-tablet",
+    "build:desk-apk": "npm run apk:debug -w @hotel-voip/front-desk",
+    "build:apks": "npm run build:desk-apk && npm run build:guest-apk && node scripts/stage-apks.mjs",
+    "start": "npm run start -w @hotel-voip/pbx-server",
+    "lint": "npm run lint -w @hotel-voip/guest-tablet && npm run lint -w @hotel-voip/front-desk && npm run lint -w @hotel-voip/pbx-server",
+    "clean": "rimraf packages/*/dist packages/pbx-server/dist"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2",
+    "rimraf": "^6.0.1"
+  }
+}

@@ -1,0 +1,13 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Front Desk</string>
+    <string name="title_activity_main">Front Desk</string>
+    <string name="package_name">com.hotelvoip.frontdesk</string>
+    <string name="custom_url_scheme">com.hotelvoip.frontdesk</string>
+    <string name="presence_channel">Standby / calls ready</string>
+    <string name="presence_channel_desc">Keeps the front desk reachable for incoming calls</string>
+    <string name="presence_title">Front Desk ready</string>
+    <string name="presence_text_idle">Ready for calls</string>
+    <string name="incoming_call_channel">Incoming calls</string>
+    <string name="incoming_call_channel_desc">Full-screen alerts for incoming intercom calls</string>
+</resources>
