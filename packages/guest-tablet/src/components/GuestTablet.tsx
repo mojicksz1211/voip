@@ -3,7 +3,7 @@ import { Capacitor } from "@capacitor/core";
 import { 
   Phone, PhoneOff, PhoneCall, Volume2, VolumeX, Mic, MicOff, 
   HelpCircle, Coffee, ShowerHead, Sparkles, Wrench, AlertTriangle, 
-  Clock, Check, Layers, History, ChevronRight, MessageSquare, Hand
+  Clock, Check, Layers, History, MessageSquare, Hand
 } from "lucide-react";
 import {
   telephonyAudio,
@@ -88,15 +88,12 @@ export default function GuestTablet({
   const isNative = Capacitor.isNativePlatform();
   const { confirm, dialog } = useGuestConfirm();
   const { requirePin, pinDialog } = useAdminPin();
-  const [dialNumber, setDialNumber] = useState<string>("");
   const [activeTab, setActiveTab] = useState<"intercom" | "requests">("intercom");
   
   // Custom quick response items
   const [isSubmittingRequest, setIsSubmittingRequest] = useState(false);
   const [requestNotes, setRequestNotes] = useState("");
   const [selectedReqType, setSelectedReqType] = useState<GuestRequest['requestType']>("towels");
-  
-  const [showDialer, setShowDialer] = useState(false);
 
   const [clockTime, setClockTime] = useState("");
   const [showAdminMenu, setShowAdminMenu] = useState(false);
@@ -167,24 +164,9 @@ export default function GuestTablet({
     { type: "other" as const, label: "Other Requests", icon: HelpCircle, bg: "bg-slate-100 text-slate-800 border-slate-200" },
   ];
 
-  // Dial pad buttons click handler
-  const handleDialClick = (char: string) => {
-    if (dialNumber.length < 5) {
-      setDialNumber((prev) => prev + char);
-      telephonyAudio.playDTMF(char);
-    }
-  };
-
-  const handleDialBackspace = () => {
-    setDialNumber((prev) => prev.slice(0, -1));
-    telephonyAudio.playDTMF("*");
-  };
-
   const handleCall = (toExtension: string) => {
     if (!toExtension) return;
     onInitiateCall(toExtension);
-    setDialNumber("");
-    setShowDialer(false);
   };
 
   const handleEmergencyCall = async () => {
@@ -364,18 +346,18 @@ export default function GuestTablet({
           <label className="block text-[11px] font-sans font-bold text-slate-500 mb-2 uppercase tracking-wider text-center">
             ROOM NUMBER (GUEST ROOM NO.)
           </label>
-          <div className="flex gap-2">
+          <div className="flex flex-col sm:flex-row gap-2">
             <input
               type="number"
               placeholder="Example: 304, 502"
               value={roomNum}
               onChange={(e) => setRoomNum(e.target.value.replace(/[^0-9]/g, ""))}
-              className="flex-1 px-4 py-2.5 text-lg text-slate-900 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 text-center font-sans font-semibold shadow-sm"
+              className="w-full sm:flex-1 min-w-0 px-4 py-2.5 text-lg text-slate-900 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 text-center font-sans font-semibold shadow-sm"
             />
             <button
               onClick={() => onRegister(roomNum)}
               disabled={!roomNum}
-              className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-300 text-white font-sans text-sm font-semibold rounded-xl hover:shadow-md transition-all active:scale-95"
+              className="w-full sm:w-auto px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-300 text-white font-sans text-sm font-semibold rounded-xl hover:shadow-md transition-all active:scale-95"
             >
               Start
             </button>
@@ -440,9 +422,9 @@ export default function GuestTablet({
 
       {/* Unified header: room info + tabs + clock */}
       <div className="bg-white px-4 sm:px-5 py-3 border-b border-slate-100 shrink-0 select-none">
-        <div className="flex items-center gap-3 sm:gap-4">
+        <div className="flex items-center gap-3 sm:gap-4 flex-wrap">
           <div
-            className="flex items-center gap-3 min-w-0 flex-1"
+            className="flex items-center gap-3 min-w-0 w-full sm:w-auto sm:flex-1 order-1"
             onTouchStart={startAdminLongPress}
             onTouchEnd={cancelAdminLongPress}
             onTouchCancel={cancelAdminLongPress}
@@ -469,11 +451,11 @@ export default function GuestTablet({
             </div>
           </div>
 
-          <div className="flex gap-1.5 shrink-0">
+          <div className="flex gap-1.5 order-3 sm:order-2 w-full sm:w-auto">
             <button
               type="button"
               onClick={() => setActiveTab("intercom")}
-              className={`px-3.5 py-2 rounded-xl text-sm font-bold transition-all flex items-center gap-1.5 border ${
+              className={`px-3.5 py-2 rounded-xl text-sm font-bold transition-all flex items-center justify-center gap-1.5 border flex-1 sm:flex-none ${
                 activeTab === "intercom"
                   ? "bg-indigo-600 text-white border-indigo-600 shadow-sm"
                   : "bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100"
@@ -485,7 +467,7 @@ export default function GuestTablet({
             <button
               type="button"
               onClick={() => setActiveTab("requests")}
-              className={`px-3.5 py-2 rounded-xl text-sm font-bold transition-all flex items-center gap-1.5 border ${
+              className={`px-3.5 py-2 rounded-xl text-sm font-bold transition-all flex items-center justify-center gap-1.5 border flex-1 sm:flex-none ${
                 activeTab === "requests"
                   ? "bg-indigo-600 text-white border-indigo-600 shadow-sm"
                   : "bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100"
@@ -496,7 +478,7 @@ export default function GuestTablet({
             </button>
           </div>
 
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-2 shrink-0 order-2 sm:order-3">
             <span className="bg-slate-100 font-bold text-base sm:text-lg px-3 py-2 rounded-xl text-slate-700 tabular-nums shadow-sm">
               {clockTime}
             </span>
@@ -611,74 +593,6 @@ export default function GuestTablet({
                 </div>
               </div>
 
-              {/* DIALPAD DRAWER TOGGLER */}
-              <div className="mt-4 pt-4 border-t border-slate-100">
-                {!showDialer ? (
-                  <button
-                    onClick={() => setShowDialer(true)}
-                    className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-all"
-                  >
-                    <span>Enter Extension Number (Keyboard Dialer)</span>
-                    <ChevronRight className="w-3.5 h-3.5" />
-                  </button>
-                ) : (
-                  <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 flex flex-col items-center max-w-xs mx-auto animate-fadeIn gap-3">
-                    <div className="w-full flex items-center justify-between border-b pb-2">
-                      <span className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-widest">
-                        Intercom Dialpad
-                      </span>
-                      <button
-                        onClick={() => setShowDialer(false)}
-                        className="text-xs text-rose-500 font-bold hover:underline"
-                      >
-                        Close
-                      </button>
-                    </div>
-
-                    {/* Dialer Screen */}
-                    <div className="w-full bg-white border border-slate-200 shadow-inner px-3 py-2 text-right rounded-lg min-h-[46px] flex items-center justify-end">
-                      <span className="text-xl font-mono font-bold text-slate-800 tracking-widest leading-none">
-                        {dialNumber || <span className="text-slate-300 text-sm font-mono tracking-normal capitalize font-normal">Dial Extension</span>}
-                      </span>
-                    </div>
-
-                    {/* Numeric Grid */}
-                    <div className="grid grid-cols-3 gap-2 w-full">
-                      {["1", "2", "3", "4", "5", "6", "7", "8", "9", "*", "0", "#"].map((num) => (
-                        <button
-                          key={num}
-                          type="button"
-                          onClick={() => handleDialClick(num)}
-                          className="py-2 hover:bg-sky-50 bg-white border border-slate-200 rounded-lg text-sm font-mono font-bold text-slate-700 hover:border-sky-200 active:scale-95 transition-all shadow-sm"
-                        >
-                          {num}
-                        </button>
-                      ))}
-                    </div>
-
-                    {/* Action buttons */}
-                    <div className="grid grid-cols-2 gap-2 w-full mt-1.5">
-                      <button
-                        type="button"
-                        onClick={handleDialBackspace}
-                        disabled={!dialNumber}
-                        className="py-2 text-[11px] font-bold bg-slate-100 border border-slate-200 text-slate-600 rounded-lg hover:bg-slate-200 disabled:opacity-50"
-                      >
-                        Backspace
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleCall(dialNumber)}
-                        disabled={!dialNumber}
-                        className="py-2 text-[11px] font-bold bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:bg-slate-300 disabled:cursor-not-allowed hover:shadow transition-all flex items-center justify-center gap-1"
-                      >
-                        <Phone className="w-3.5 h-3.5" />
-                        <span>Call</span>
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
             </div>
           )}
 
