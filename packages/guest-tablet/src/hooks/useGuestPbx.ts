@@ -5,6 +5,7 @@ import {
   GuestRequest,
   CallMetadata,
   apiFetch,
+  getApiBase,
   getEventsUrl,
   useWebRtcVoice,
   acquireMicrophone,
@@ -14,6 +15,8 @@ import {
   resolveLiveKitMicCapture,
   getRetroHandsetMode,
   RETRO_HANDSET_REMOTE_PLAYBACK_CAP,
+  subscribeRetroHandsetMode,
+  useHandsetHook,
 } from "@hotel-voip/shared";
 import {
   applyCallAudioState,
@@ -24,6 +27,7 @@ import {
   playHangupSound,
   scheduleAndroidHangupPlayback,
   wakeScreenForCall,
+  subscribeHandsetHook,
 } from "../utils/callAudio";
 import {
   startCallForeground,
@@ -41,6 +45,8 @@ import {
 
 const isAndroidNative =
   Capacitor.isNativePlatform() && Capacitor.getPlatform() === "android";
+
+const GUEST_HEARTBEAT_MS = 20_000;
 
 function getInitialRoom(): string {
   const params = new URLSearchParams(window.location.search);
@@ -65,6 +71,7 @@ export function useGuestPbx() {
   const [connectionStatus, setConnectionStatus] =
     useState<GuestConnectionStatus>("connecting");
   const [appAlert, setAppAlert] = useState<string | null>(null);
+  const [retroHandset, setRetroHandset] = useState(() => getRetroHandsetMode());
 
   const showAppAlert = useCallback((message: string) => {
     setAppAlert(message);
@@ -153,6 +160,7 @@ export function useGuestPbx() {
 
   const eventSourceRef = useRef<EventSource | null>(null);
   const roomNumRef = useRef(roomNum);
+  const lastRegisteredExtRef = useRef<string | null>(null);
   const autoRegisterAttemptedRef = useRef(false);
   const registerDeviceRef = useRef<(room: string) => Promise<void>>(async () => {});
 
@@ -291,6 +299,23 @@ export function useGuestPbx() {
   }, [clearMicStream]);
 
   useEffect(() => {
+    if (!isRegistered || !roomNum) return;
+
+    const sendHeartbeat = () => {
+      void apiFetch("/api/sip/heartbeat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ extension: roomNumRef.current }),
+        keepalive: true,
+      }).catch(() => {});
+    };
+
+    sendHeartbeat();
+    const timer = window.setInterval(sendHeartbeat, GUEST_HEARTBEAT_MS);
+    return () => clearInterval(timer);
+  }, [isRegistered, roomNum]);
+
+  useEffect(() => {
     if (isRegistered && roomNum) {
       const match = extensions.find((ex) => ex.extension === roomNum);
       if (!match || match.status === "offline") {
@@ -314,7 +339,7 @@ export function useGuestPbx() {
   useEffect(() => {
     if (!isAndroidNative) return;
     if (isRegistered && roomNum) {
-      startPresenceService(roomNum);
+      startPresenceService(roomNum, getApiBase());
     } else {
       stopPresenceService();
     }
@@ -510,10 +535,27 @@ export function useGuestPbx() {
     }
   }, [clearMicStream]);
 
+  useEffect(() => subscribeRetroHandsetMode(setRetroHandset), []);
+
+  useHandsetHook(
+    isAndroidNative && retroHandset,
+    subscribeHandsetHook,
+    String(roomNum),
+    currentCall,
+    {
+      onAnswer: (callId) => void handleAnswerCall(callId),
+      onHangup: (callId) => void handleHangupCall(callId),
+    },
+  );
+
   const handleRegisterDevice = useCallback(async (room: string) => {
     if (!room) return;
     const previousExtension =
-      isRegistered && roomNumRef.current !== room ? roomNumRef.current : undefined;
+      lastRegisteredExtRef.current && lastRegisteredExtRef.current !== room
+        ? lastRegisteredExtRef.current
+        : roomNumRef.current !== room
+          ? roomNumRef.current
+          : undefined;
 
     try {
       if (previousExtension) {
@@ -536,6 +578,7 @@ export function useGuestPbx() {
       if (res.ok) {
         setRoomNum(room);
         setIsRegistered(true);
+        lastRegisteredExtRef.current = room;
         if (isAndroidNative) {
           setStoredRoom(room);
         }
@@ -543,7 +586,7 @@ export function useGuestPbx() {
     } catch (e) {
       console.error("Register device failed:", e);
     }
-  }, [isRegistered]);
+  }, []);
 
   const handleUnregisterDevice = useCallback(async () => {
     try {
@@ -553,6 +596,7 @@ export function useGuestPbx() {
         body: JSON.stringify({ extension: roomNumRef.current }),
       });
       setIsRegistered(false);
+      lastRegisteredExtRef.current = null;
       if (isAndroidNative) {
         clearStoredRoom();
       }

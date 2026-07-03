@@ -6,6 +6,7 @@ import {
   CallMetadata,
   apiFetch,
   getEventsUrl,
+  normalizeExtensions,
   useWebRtcVoice,
   acquireMicrophone,
   releaseMicrophoneStream,
@@ -14,6 +15,8 @@ import {
   resolveLiveKitMicCapture,
   getRetroHandsetMode,
   RETRO_HANDSET_REMOTE_PLAYBACK_CAP,
+  subscribeRetroHandsetMode,
+  useHandsetHook,
 } from "@hotel-voip/shared";
 import {
   applyCallAudioState,
@@ -29,6 +32,7 @@ import {
   scheduleAndroidHangupPlayback,
   presentIncomingCall,
   cancelIncomingCall,
+  subscribeHandsetHook,
 } from "../utils/callAudio";
 import {
   getDeskAudioSettings,
@@ -36,12 +40,15 @@ import {
 } from "../utils/deskAudioSettings";
 
 const DESK_EXT = "000";
+const DESK_STATE_REFRESH_MS = 25_000;
+const DESK_PRESENCE_TICK_MS = 15_000;
 
 export function useFrontDeskPbx() {
   const [extensions, setExtensions] = useState<SIPExtension[]>([]);
   const [calls, setCalls] = useState<CallRecord[]>([]);
   const [requests, setRequests] = useState<GuestRequest[]>([]);
   const [currentCall, setCurrentCall] = useState<CallMetadata | null>(null);
+  const [retroHandset, setRetroHandset] = useState(() => getRetroHandsetMode());
 
   const micStreamRef = useRef<MediaStream | null>(null);
   const playbackContextRef = useRef<AudioContext | null>(null);
@@ -191,6 +198,17 @@ export function useFrontDeskPbx() {
 
   const eventSourceRef = useRef<EventSource | null>(null);
 
+  const applyExtensions = useCallback((items: SIPExtension[]) => {
+    setExtensions(normalizeExtensions(items));
+  }, []);
+
+  useEffect(() => {
+    const tick = window.setInterval(() => {
+      setExtensions((prev) => normalizeExtensions(prev));
+    }, DESK_PRESENCE_TICK_MS);
+    return () => clearInterval(tick);
+  }, []);
+
   useEffect(() => {
     const hangupIfRinging = () => {
       const call = currentCallRef.current;
@@ -215,7 +233,7 @@ export function useFrontDeskPbx() {
       try {
         const res = await apiFetch("/api/pbx/state");
         const data = await res.json();
-        setExtensions(data.extensions || []);
+        applyExtensions(data.extensions || []);
         setCalls(data.calls || []);
         setRequests(data.requests || []);
       } catch (err) {
@@ -223,6 +241,9 @@ export function useFrontDeskPbx() {
       }
     };
     fetchState();
+    const refreshTimer = window.setInterval(() => {
+      void fetchState();
+    }, DESK_STATE_REFRESH_MS);
 
     const setupSSE = () => {
       if (eventSourceRef.current) {
@@ -234,22 +255,22 @@ export function useFrontDeskPbx() {
 
       es.addEventListener("sync", (e: MessageEvent) => {
         const payload = JSON.parse(e.data);
-        setExtensions(payload.extensions || []);
+        applyExtensions(payload.extensions || []);
         setCalls(payload.calls || []);
         setRequests(payload.requests || []);
       });
 
       es.addEventListener("extension-update", (e: MessageEvent) => {
-        const { extension } = JSON.parse(e.data);
+        const { extension } = JSON.parse(e.data) as { extension: SIPExtension };
         setExtensions((prev) => {
           const filtered = prev.filter((ex) => ex.extension !== extension.extension);
-          return [...filtered, extension];
+          return normalizeExtensions([...filtered, extension]);
         });
       });
 
       es.addEventListener("extension-change", (e: MessageEvent) => {
         const payload = JSON.parse(e.data);
-        setExtensions(payload.extensions || []);
+        applyExtensions(payload.extensions || []);
         if (payload.calls) {
           setCalls(payload.calls);
         }
@@ -313,9 +334,10 @@ export function useFrontDeskPbx() {
     setupSSE();
 
     return () => {
+      clearInterval(refreshTimer);
       eventSourceRef.current?.close();
     };
-  }, [clearMicStream, setLiveKitUrl]);
+  }, [applyExtensions, clearMicStream, setLiveKitUrl]);
 
   useEffect(() => {
     if (
@@ -452,6 +474,19 @@ export function useFrontDeskPbx() {
       clearMicStream();
     }
   }, [clearMicStream]);
+
+  useEffect(() => subscribeRetroHandsetMode(setRetroHandset), []);
+
+  useHandsetHook(
+    isAndroidNative && retroHandset,
+    subscribeHandsetHook,
+    DESK_EXT,
+    currentCall,
+    {
+      onAnswer: (callId) => void handleAnswerCall(callId),
+      onHangup: (callId) => void handleHangupCall(callId),
+    },
+  );
 
   const handleUpdateRequestStatus = useCallback(async (id: string, status: GuestRequest['status']) => {
     try {

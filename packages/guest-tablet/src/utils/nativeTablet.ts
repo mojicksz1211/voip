@@ -21,7 +21,7 @@ interface TabletPlugin {
   openSecuritySettings(): Promise<void>;
   startCallService(options: { label: string }): Promise<void>;
   stopCallService(): Promise<void>;
-  startPresenceService(options: { room: string }): Promise<void>;
+  startPresenceService(options: { room: string; serverUrl?: string }): Promise<void>;
   stopPresenceService(): Promise<void>;
   isBatteryExemptionGranted(): Promise<{ granted: boolean }>;
   requestBatteryExemption(): Promise<void>;
@@ -83,9 +83,9 @@ export function stopCallForeground(): void {
 }
 
 /** Keep the tablet reachable for incoming calls while a room is registered. */
-export function startPresenceService(room: string): void {
+export function startPresenceService(room: string, serverUrl = ''): void {
   if (!isAndroidNative) return;
-  void Tablet.startPresenceService({ room }).catch(() => {});
+  void Tablet.startPresenceService({ room, serverUrl }).catch(() => {});
 }
 
 export function stopPresenceService(): void {

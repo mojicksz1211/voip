@@ -2,6 +2,7 @@ import express from "express";
 import path from "path";
 import { fileURLToPath } from "url";
 import { SIPExtension, GuestRequest, CallRecord, SIPMessage } from "@hotel-voip/shared/types";
+import { isGuestExtensionStale, parseExtensionLastSeenMs } from "@hotel-voip/shared";
 import {
   createParticipantToken,
   deleteCallRoom,
@@ -154,6 +155,65 @@ interface ActiveSession {
 const activeSessions = new Map<string, ActiveSession>();
 const ringTimeouts = new Map<string, ReturnType<typeof setTimeout>>();
 const RING_TIMEOUT_MS = 45_000;
+const GUEST_HEARTBEAT_STALE_MS = 75_000;
+const GUEST_STALE_SWEEP_MS = 30_000;
+
+function broadcastExtensionChange() {
+  broadcast("extension-change", { extensions: Object.values(extensions) });
+}
+
+function offlineGuestExtension(ext: string): boolean {
+  const extObj = extensions[ext];
+  if (!extObj || extObj.clientType !== "guest") return false;
+  if (extObj.status === "offline") return false;
+  extObj.status = "offline";
+  return true;
+}
+
+function touchGuestExtension(ext: string, ip: string) {
+  const extObj = extensions[ext];
+  if (!extObj || extObj.clientType !== "guest") return false;
+  extObj.lastSeen = new Date();
+  extObj.ip = ip;
+  if (extObj.status === "offline") {
+    extObj.status = "online";
+  }
+  return true;
+}
+
+function parseLastSeenMs(lastSeen: Date | string): number {
+  return parseExtensionLastSeenMs(lastSeen);
+}
+
+function guestIsReachable(extObj: SIPExtension | undefined): boolean {
+  if (!extObj || extObj.clientType !== "guest") return true;
+  return !isGuestExtensionStale(extObj);
+}
+
+function setExtensionAfterCall(extObj: SIPExtension | undefined) {
+  if (!extObj) return;
+  if (extObj.clientType === "guest") {
+    extObj.status = guestIsReachable(extObj) ? "online" : "offline";
+    return;
+  }
+  extObj.status = "online";
+}
+
+function sweepStaleGuestExtensions() {
+  const now = Date.now();
+  let changed = false;
+
+  for (const extObj of Object.values(extensions)) {
+    if (extObj.clientType !== "guest" || extObj.status === "offline") continue;
+    if (now - parseLastSeenMs(extObj.lastSeen) <= GUEST_HEARTBEAT_STALE_MS) continue;
+    extObj.status = "offline";
+    changed = true;
+  }
+
+  if (changed) {
+    broadcastExtensionChange();
+  }
+}
 
 function getClientIp(req: express.Request): string {
   const forwarded = req.headers["x-forwarded-for"];
@@ -162,12 +222,6 @@ function getClientIp(req: express.Request): string {
   }
   const raw = req.socket.remoteAddress || req.ip || "127.0.0.1";
   return raw.replace(/^::ffff:/, "");
-}
-
-function offlineGuestExtension(ext: string) {
-  const extObj = extensions[ext];
-  if (!extObj || extObj.clientType !== "guest") return;
-  extObj.status = "offline";
 }
 
 function findSessionByExtension(ext: string): ActiveSession | undefined {
@@ -185,7 +239,11 @@ function reconcileExtensionStatus(ext: string) {
   if (!extObj || extObj.status === "offline" || extObj.status === "online") return;
 
   if (!findSessionByExtension(ext)) {
-    extObj.status = "online";
+    if (extObj.clientType === "guest" && !guestIsReachable(extObj)) {
+      extObj.status = "offline";
+    } else {
+      extObj.status = "online";
+    }
   }
 }
 
@@ -203,10 +261,8 @@ function clearAllRingTimeouts() {
 }
 
 function releaseCallExtensions(session: ActiveSession) {
-  const from = extensions[session.fromExt];
-  const to = extensions[session.toExt];
-  if (from) from.status = "online";
-  if (to) to.status = "online";
+  setExtensionAfterCall(extensions[session.fromExt]);
+  setExtensionAfterCall(extensions[session.toExt]);
 }
 
 function scheduleRingTimeout(callId: string) {
@@ -299,6 +355,7 @@ async function startServer() {
   });
 
   app.get("/api/pbx/state", (_req, res) => {
+    sweepStaleGuestExtensions();
     res.json({
       extensions: Object.values(extensions),
       calls,
@@ -308,6 +365,7 @@ async function startServer() {
   });
 
   app.get("/api/events", (req, res) => {
+    sweepStaleGuestExtensions();
     res.setHeader("Content-Type", "text/event-stream");
     res.setHeader("Cache-Control", "no-cache");
     res.setHeader("Connection", "keep-alive");
@@ -362,7 +420,26 @@ async function startServer() {
     const log = logSIPPacket("REGISTER", extension, name, extension, name, callId);
 
     broadcast("extension-update", { extension: extensions[extension], logs: [log] });
-    broadcast("extension-change", { extensions: Object.values(extensions) });
+    broadcastExtensionChange();
+    res.json({ success: true, extension: extensions[extension] });
+  });
+
+  app.post("/api/sip/heartbeat", (req, res) => {
+    const { extension } = req.body;
+    if (!extension || !extensions[extension]) {
+      return res.status(404).json({ error: "Extension not registered." });
+    }
+
+    const extObj = extensions[extension];
+    if (extObj.clientType !== "guest") {
+      return res.status(400).json({ error: "Heartbeat is only valid for guest extensions." });
+    }
+
+    const ip = getClientIp(req);
+    if (!touchGuestExtension(extension, ip)) {
+      return res.status(404).json({ error: "Extension not registered." });
+    }
+
     res.json({ success: true, extension: extensions[extension] });
   });
 
@@ -372,6 +449,7 @@ async function startServer() {
       extensions[extension].status = "offline";
       const entity = extensions[extension];
       broadcast("extension-update", { extension: entity });
+      broadcastExtensionChange();
     }
     res.json({ success: true });
   });
@@ -709,6 +787,7 @@ async function startServer() {
   }
 
   app.listen(PORT, "0.0.0.0", () => {
+    setInterval(sweepStaleGuestExtensions, GUEST_STALE_SWEEP_MS);
     console.log(`IP-PBX local intercom server running on http://0.0.0.0:${PORT}`);
     console.log(`  LiveKit media: ${process.env.LIVEKIT_HOST || "http://127.0.0.1:7880"} (run: npm run livekit)`);
     if (process.env.NODE_ENV !== "production") {

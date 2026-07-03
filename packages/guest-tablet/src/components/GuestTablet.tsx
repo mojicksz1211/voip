@@ -14,6 +14,7 @@ import {
   getRetroHandsetMode,
   setRetroHandsetMode,
   subscribeRetroHandsetMode,
+  getRoomGreeting,
 } from "@hotel-voip/shared";
 import { useGuestConfirm } from "../hooks/useGuestConfirm";
 import { useAdminPin } from "../hooks/useAdminPin";
@@ -317,8 +318,8 @@ export default function GuestTablet({
             <div className="mb-4 bg-indigo-50 text-indigo-600 p-4 rounded-full border border-indigo-100 shadow-sm animate-pulse">
               <Layers className="w-10 h-10" />
             </div>
-            <h1 className="text-xl font-bold text-slate-900 text-center">Connecting Room {roomNum}</h1>
-            <p className="text-slate-500 text-xs mt-2 text-center">Registering with hotel VoIP server…</p>
+            <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 text-center">{getRoomGreeting(roomNum)}</h1>
+            <p className="text-slate-500 text-sm sm:text-base mt-3 text-center">Registering with hotel VoIP server…</p>
           </div>
         </div>
       );
@@ -421,7 +422,7 @@ export default function GuestTablet({
       )}
 
       {/* Unified header: room info + tabs + clock */}
-      <div className="bg-white px-4 sm:px-5 py-3 border-b border-slate-100 shrink-0 select-none">
+      <div className="bg-white px-4 sm:px-5 py-3 border-b border-slate-100 shrink-0 select-none safe-area-pt">
         <div className="flex items-center gap-3 sm:gap-4 flex-wrap">
           <div
             className="flex items-center gap-3 min-w-0 w-full sm:w-auto sm:flex-1 order-1"
@@ -512,9 +513,18 @@ export default function GuestTablet({
           {activeTab === "intercom" && (
             <div className="flex-1 flex flex-col justify-between gap-4">
               
-              {/* SPEED DIAL GRID */}
+              {/* GREETING + SPEED DIAL GRID */}
               <div>
-                <h5 className="text-[10px] font-sans font-bold text-slate-400 mb-3.5 uppercase tracking-widest text-center">
+                <div className="text-center mb-5 px-2">
+                  <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-slate-900 leading-tight tracking-tight">
+                    {getRoomGreeting(roomNum)}
+                  </h2>
+                  <p className="text-sm sm:text-base text-slate-400 mt-2 font-medium">
+                    Ext {roomNum} · {serverHost}
+                  </p>
+                </div>
+
+                <h5 className="text-sm sm:text-base font-sans font-bold text-slate-500 mb-4 uppercase tracking-widest text-center">
                   Speed Dial — Reception & Services
                 </h5>
                 
@@ -522,73 +532,73 @@ export default function GuestTablet({
                   {/* Front Desk Button */}
                   <button
                     onClick={() => handleCall("000")}
-                    className="p-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl shadow-sm border border-indigo-700 flex flex-col items-center justify-center gap-2 transition-all group active:scale-95"
+                    className="p-5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl shadow-sm border border-indigo-700 flex flex-col items-center justify-center gap-2.5 transition-all group active:scale-95"
                   >
-                    <div className="bg-white/10 p-2.5 rounded-xl group-hover:scale-105 transition-transform flex items-center justify-center">
-                      <PhoneCall className="w-5 h-5 text-white" />
+                    <div className="bg-white/10 p-3 rounded-xl group-hover:scale-105 transition-transform flex items-center justify-center">
+                      <PhoneCall className="w-6 h-6 text-white" />
                     </div>
-                    <span className="text-xs font-bold tracking-tight">FRONT DESK</span>
-                    <span className="text-[10px] text-indigo-200 font-medium">Ext 000 (Reception)</span>
+                    <span className="text-sm sm:text-base font-bold tracking-tight">FRONT DESK</span>
+                    <span className="text-xs sm:text-sm text-indigo-200 font-medium">Ext 000 (Reception)</span>
                   </button>
 
                   {/* Housekeeping */}
                   <button
                     onClick={() => handleCall("101")}
-                    className="p-4 bg-white hover:bg-slate-50 text-slate-900 rounded-2xl border border-slate-100 shadow-sm flex flex-col items-center justify-center gap-2 cursor-pointer hover:shadow-md transition-shadow active:scale-95"
+                    className="p-5 bg-white hover:bg-slate-50 text-slate-900 rounded-2xl border border-slate-100 shadow-sm flex flex-col items-center justify-center gap-2.5 cursor-pointer hover:shadow-md transition-shadow active:scale-95"
                   >
-                    <div className="w-10 h-10 bg-slate-50 rounded-xl flex items-center justify-center text-slate-600">
-                      <ShowerHead className="w-5 h-5" />
+                    <div className="w-12 h-12 bg-slate-50 rounded-xl flex items-center justify-center text-slate-600">
+                      <ShowerHead className="w-6 h-6" />
                     </div>
-                    <span className="text-xs font-bold tracking-tight">HOUSEKEEPING</span>
-                    <span className="text-[10px] text-slate-400 font-bold uppercase">Ext 101</span>
+                    <span className="text-sm sm:text-base font-bold tracking-tight">HOUSEKEEPING</span>
+                    <span className="text-xs sm:text-sm text-slate-400 font-bold uppercase">Ext 101</span>
                   </button>
 
                   {/* Room Service / Food */}
                   <button
                     onClick={() => handleCall("102")}
-                    className="p-4 bg-white hover:bg-slate-50 text-slate-900 rounded-2xl border border-slate-100 shadow-sm flex flex-col items-center justify-center gap-2 cursor-pointer hover:shadow-md transition-shadow active:scale-95"
+                    className="p-5 bg-white hover:bg-slate-50 text-slate-900 rounded-2xl border border-slate-100 shadow-sm flex flex-col items-center justify-center gap-2.5 cursor-pointer hover:shadow-md transition-shadow active:scale-95"
                   >
-                    <div className="w-10 h-10 bg-slate-50 rounded-xl flex items-center justify-center text-slate-600">
-                      <Coffee className="w-5 h-5" />
+                    <div className="w-12 h-12 bg-slate-50 rounded-xl flex items-center justify-center text-slate-600">
+                      <Coffee className="w-6 h-6" />
                     </div>
-                    <span className="text-xs font-bold tracking-tight">ROOM SERVICE</span>
-                    <span className="text-[10px] text-slate-400 font-bold uppercase">Ext 102</span>
+                    <span className="text-sm sm:text-base font-bold tracking-tight">ROOM SERVICE</span>
+                    <span className="text-xs sm:text-sm text-slate-400 font-bold uppercase">Ext 102</span>
                   </button>
 
                   {/* Laundry */}
                   <button
                     onClick={() => handleCall("103")}
-                    className="p-4 bg-white hover:bg-slate-50 text-slate-900 rounded-2xl border border-slate-100 shadow-sm flex flex-col items-center justify-center gap-2 cursor-pointer hover:shadow-md transition-shadow active:scale-95"
+                    className="p-5 bg-white hover:bg-slate-50 text-slate-900 rounded-2xl border border-slate-100 shadow-sm flex flex-col items-center justify-center gap-2.5 cursor-pointer hover:shadow-md transition-shadow active:scale-95"
                   >
-                    <div className="w-10 h-10 bg-slate-50 rounded-xl flex items-center justify-center text-slate-600">
-                      <Layers className="w-5 h-5" />
+                    <div className="w-12 h-12 bg-slate-50 rounded-xl flex items-center justify-center text-slate-600">
+                      <Layers className="w-6 h-6" />
                     </div>
-                    <span className="text-xs font-bold tracking-tight">LAUNDRY</span>
-                    <span className="text-[10px] text-slate-400 font-bold uppercase">Ext 103</span>
+                    <span className="text-sm sm:text-base font-bold tracking-tight">LAUNDRY</span>
+                    <span className="text-xs sm:text-sm text-slate-400 font-bold uppercase">Ext 103</span>
                   </button>
 
                   {/* Maintenance */}
                   <button
                     onClick={() => handleCall("104")}
-                    className="p-4 bg-white hover:bg-slate-50 text-slate-900 rounded-2xl border border-slate-100 shadow-sm flex flex-col items-center justify-center gap-2 cursor-pointer hover:shadow-md transition-shadow active:scale-95"
+                    className="p-5 bg-white hover:bg-slate-50 text-slate-900 rounded-2xl border border-slate-100 shadow-sm flex flex-col items-center justify-center gap-2.5 cursor-pointer hover:shadow-md transition-shadow active:scale-95"
                   >
-                    <div className="w-10 h-10 bg-slate-50 rounded-xl flex items-center justify-center text-slate-600">
-                      <Wrench className="w-5 h-5" />
+                    <div className="w-12 h-12 bg-slate-50 rounded-xl flex items-center justify-center text-slate-600">
+                      <Wrench className="w-6 h-6" />
                     </div>
-                    <span className="text-xs font-bold tracking-tight">MAINTENANCE</span>
-                    <span className="text-[10px] text-slate-400 font-bold uppercase">Ext 104</span>
+                    <span className="text-sm sm:text-base font-bold tracking-tight">MAINTENANCE</span>
+                    <span className="text-xs sm:text-sm text-slate-400 font-bold uppercase">Ext 104</span>
                   </button>
 
                   {/* Emergency Trigger */}
                   <button
                     onClick={() => void handleEmergencyCall()}
-                    className="p-4 bg-rose-50 hover:bg-rose-100 text-rose-800 rounded-2xl border border-rose-100/80 shadow-sm flex flex-col items-center justify-center gap-2 cursor-pointer transition-all active:scale-95"
+                    className="p-5 bg-rose-50 hover:bg-rose-100 text-rose-800 rounded-2xl border border-rose-100/80 shadow-sm flex flex-col items-center justify-center gap-2.5 cursor-pointer transition-all active:scale-95"
                   >
-                    <div className="w-10 h-10 bg-rose-600 rounded-xl flex items-center justify-center text-white shadow-sm shadow-rose-200">
-                      <AlertTriangle className="w-5 h-5" />
+                    <div className="w-12 h-12 bg-rose-600 rounded-xl flex items-center justify-center text-white shadow-sm shadow-rose-200">
+                      <AlertTriangle className="w-6 h-6" />
                     </div>
-                    <span className="text-xs font-bold tracking-tight text-rose-700">EMERGENCY</span>
-                    <span className="text-[10px] text-rose-500 font-bold uppercase">Ext 911</span>
+                    <span className="text-sm sm:text-base font-bold tracking-tight text-rose-700">EMERGENCY</span>
+                    <span className="text-xs sm:text-sm text-rose-500 font-bold uppercase">Ext 911</span>
                   </button>
                 </div>
               </div>
@@ -599,50 +609,60 @@ export default function GuestTablet({
           {/* CUSTOM ROOM REQUESTS TAB */}
           {activeTab === "requests" && (
             <div className="flex-1 flex flex-col gap-4">
-              <div className="border border-indigo-100 bg-indigo-50/40 rounded-xl p-3.5 text-slate-700 text-xs">
-                <p className="font-bold flex items-center gap-1.5 text-indigo-900">
-                  <Hand className="w-4 h-4" />
+              <div className="border border-indigo-100 bg-indigo-50/40 rounded-2xl p-5 text-slate-700">
+                <p className="font-bold flex items-center gap-2 text-indigo-900 text-base sm:text-lg">
+                  <Hand className="w-5 h-5" />
                   <span>Need Service or Supplies?</span>
                 </p>
-                <p className="text-[11px] text-slate-500 mt-1">
+                <p className="text-sm sm:text-base text-slate-500 mt-1.5 leading-relaxed">
                   Select what you need below. Our local server will send it directly to the Front Desk and log it as a SIP MESSAGE packet.
                 </p>
               </div>
 
               {/* QUICK REQ TYPE PICKER */}
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                {requestCatalog.map((catalog) => {
-                  const IconComp = catalog.icon;
-                  return (
-                    <button
-                      key={catalog.type}
-                      type="button"
-                      onClick={() => setSelectedReqType(catalog.type as any)}
-                      className={`p-2 border rounded-xl flex items-center gap-2 select-none text-left transition-all ${
-                        selectedReqType === catalog.type
-                          ? "ring-2 ring-indigo-500 bg-indigo-50 text-indigo-900 border-indigo-300 font-bold"
-                          : "bg-white hover:bg-slate-50 border-slate-200 text-slate-700"
-                      }`}
-                    >
-                      <span className={`p-1.5 rounded-lg border ${selectedReqType === catalog.type ? "bg-indigo-100/50" : "bg-slate-50"}`}>
-                        <IconComp className="w-4 h-4 text-indigo-600" />
-                      </span>
-                      <span className="text-[11px] leading-tight font-medium truncate sm:whitespace-normal">
-                        {catalog.type === "towels" ? "Towels" :
-                         catalog.type === "water" ? "Bottled Water" :
-                         catalog.type === "cleanup" ? "Room Cleanup" :
-                         catalog.type === "laundry" ? "Laundry" :
-                         catalog.type === "wakeup" ? "Wake-up Call" : "Other"}
-                      </span>
-                    </button>
-                  );
-                })}
+              <div>
+                <h5 className="text-sm sm:text-base font-sans font-bold text-slate-500 mb-4 uppercase tracking-widest text-center">
+                  Choose a Request
+                </h5>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                  {requestCatalog.map((catalog) => {
+                    const IconComp = catalog.icon;
+                    const isSelected = selectedReqType === catalog.type;
+                    return (
+                      <button
+                        key={catalog.type}
+                        type="button"
+                        onClick={() => setSelectedReqType(catalog.type as any)}
+                        className={`p-5 border rounded-2xl shadow-sm flex flex-col items-center justify-center gap-2.5 select-none transition-all active:scale-95 ${
+                          isSelected
+                            ? "ring-2 ring-indigo-500 bg-indigo-50 text-indigo-900 border-indigo-300"
+                            : "bg-white hover:bg-slate-50 border-slate-100 text-slate-900 hover:shadow-md"
+                        }`}
+                      >
+                        <div
+                          className={`w-12 h-12 rounded-xl flex items-center justify-center ${
+                            isSelected ? "bg-indigo-100 text-indigo-700" : "bg-slate-50 text-slate-600"
+                          }`}
+                        >
+                          <IconComp className="w-6 h-6" />
+                        </div>
+                        <span className="text-sm sm:text-base font-bold tracking-tight text-center leading-tight">
+                          {catalog.type === "towels" ? "Towels" :
+                           catalog.type === "water" ? "Bottled Water" :
+                           catalog.type === "cleanup" ? "Room Cleanup" :
+                           catalog.type === "laundry" ? "Laundry" :
+                           catalog.type === "wakeup" ? "Wake-up Call" : "Other"}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
 
               {/* REQUEST SUBMISSION FORM */}
-              <form onSubmit={handlePublishRequest} className="bg-slate-50 border border-slate-200/60 rounded-xl p-3.5 space-y-3">
+              <form onSubmit={handlePublishRequest} className="bg-slate-50 border border-slate-200/60 rounded-2xl p-5 space-y-4">
                 <div>
-                  <label className="block text-[11px] font-sans uppercase font-bold text-slate-400 mb-1 tracking-wider">
+                  <label className="block text-xs sm:text-sm font-sans uppercase font-bold text-slate-400 mb-2 tracking-wider">
                     Additional details or instructions (Optional Note)
                   </label>
                   <input
@@ -650,7 +670,7 @@ export default function GuestTablet({
                     placeholder="E.g. Two towels, or wake me up at 6 AM."
                     value={requestNotes}
                     onChange={(e) => setRequestNotes(e.target.value)}
-                    className="w-full px-3 py-2 text-xs text-slate-800 bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                    className="w-full px-4 py-3 text-sm sm:text-base text-slate-800 bg-white border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
                   />
                 </div>
 
@@ -658,13 +678,13 @@ export default function GuestTablet({
                   <button
                     type="submit"
                     disabled={isSubmittingRequest}
-                    className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white disabled:bg-slate-300 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5"
+                    className="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white disabled:bg-slate-300 text-sm sm:text-base font-bold rounded-xl transition-all flex items-center gap-2 active:scale-95"
                   >
                     {isSubmittingRequest ? (
                       <span>Sending...</span>
                     ) : (
                       <>
-                        <Check className="w-3.5 h-3.5" />
+                        <Check className="w-5 h-5" />
                         <span>Submit Request</span>
                       </>
                     )}
@@ -676,7 +696,7 @@ export default function GuestTablet({
         </div>
 
         {/* Right Side Content (Call Status / Requests Backlog tracker Sidebar) */}
-        <div className="w-full lg:w-72 bg-slate-50 border-t lg:border-t-0 lg:border-l border-slate-200 p-4 flex flex-col justify-between shrink-0 min-h-[300px] lg:min-h-0 select-none">
+        <div className="w-full lg:w-72 bg-slate-50 border-t lg:border-t-0 lg:border-l border-slate-200 p-4 flex flex-col justify-between shrink-0 min-h-[200px] sm:min-h-[240px] lg:min-h-0 select-none">
           
           {/* ACTIVE CALL PANEL SCREEN Overlay */}
           {currentCall ? (

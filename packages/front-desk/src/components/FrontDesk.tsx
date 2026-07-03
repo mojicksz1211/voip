@@ -8,6 +8,7 @@ import DeskRecentsPanel from './desk/DeskRecentsPanel';
 import DeskRoomsPanel from './desk/DeskRoomsPanel';
 import DeskRequestsPanel from './desk/DeskRequestsPanel';
 import DeskSettingsPanel from './desk/DeskSettingsPanel';
+import DeskDashboardPanel from './desk/DeskDashboardPanel';
 import ActiveCallOverlay from './desk/ActiveCallOverlay';
 import IncomingCallModal from './desk/IncomingCallModal';
 import OutgoingCallModal from './desk/OutgoingCallModal';
@@ -72,7 +73,7 @@ export default function FrontDesk({
   onRequestNotifications = () => {},
   onServerSetup,
 }: FrontDeskProps) {
-  const [activeNav, setActiveNav] = useState<DeskNav>('rooms');
+  const [activeNav, setActiveNav] = useState<DeskNav>('dashboard');
   const [autoAnswer, setAutoAnswerState] = useState(() => getAutoAnswer());
   const [dnd, setDndState] = useState(() => getDnd());
   const [operatorStatus, setOperatorStatus] = useState<OperatorStatus>('online');
@@ -130,6 +131,20 @@ export default function FrontDesk({
 
   const renderMainPanel = () => {
     switch (activeNav) {
+      case 'dashboard':
+        return (
+          <DeskDashboardPanel
+            extensions={extensions}
+            calls={calls}
+            requests={requests}
+            currentCall={currentCall}
+            isVoiceConnected={isVoiceConnected}
+            voiceError={voiceError}
+            onDial={handleDial}
+            onNavChange={setActiveNav}
+            dnd={effectiveDnd}
+          />
+        );
       case 'recents':
         return (
           <DeskRecentsPanel
@@ -212,8 +227,8 @@ export default function FrontDesk({
           </div>
         )}
 
-        <div className="flex-1 min-h-0 p-5 overflow-hidden flex flex-col">
-          <div className="flex-1 min-h-0 overflow-hidden">
+        <div className="flex-1 min-h-0 p-5 overflow-y-auto flex flex-col">
+          <div className="flex-1 min-h-0 overflow-y-auto flex flex-col">
             {activeNav === 'keypad' ? (
               <DeskRecentsPanel
                 calls={calls}
@@ -235,7 +250,7 @@ export default function FrontDesk({
             onNavChange={setActiveNav}
             pendingRequests={pendingRequests}
           />
-          <div className="flex-1 min-h-0 p-5 overflow-hidden flex flex-col gap-5">
+          <div className="flex-1 min-h-0 p-5 overflow-y-auto flex flex-col gap-5">
             {activeNav === 'keypad' ? (
               <div className="flex flex-1 min-h-0 gap-4">
                 <div className="w-[340px] shrink-0 bg-white rounded-2xl desk-shadow-card overflow-hidden">
@@ -254,7 +269,7 @@ export default function FrontDesk({
 
       {/* Mobile layout: single panel + bottom nav */}
       <div className="flex md:hidden flex-1 min-h-0 flex-col">
-        <div className="flex-1 min-h-0 p-4 overflow-hidden">
+        <div className="flex-1 min-h-0 p-4 overflow-y-auto flex flex-col">
           {activeNav === 'keypad' && (
             <DeskDialer onCall={handleDial} disabled={effectiveDnd} />
           )}

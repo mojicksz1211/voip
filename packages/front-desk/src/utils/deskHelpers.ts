@@ -5,7 +5,7 @@ const AUTO_ANSWER_KEY = 'hotel-voip-desk-auto-answer';
 const DND_KEY = 'hotel-voip-desk-dnd';
 
 export type RecentsTab = 'recent' | 'missed' | 'favorites';
-export type DeskNav = 'keypad' | 'recents' | 'rooms' | 'requests' | 'settings';
+export type DeskNav = 'dashboard' | 'keypad' | 'recents' | 'rooms' | 'requests' | 'settings';
 export type OperatorStatus = 'online' | 'offline' | 'dnd';
 
 export function getInitials(name: string): string {

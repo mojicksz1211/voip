@@ -148,7 +148,7 @@ export default function DeskRecentsPanel({
               handleToggleFavorite(peerExt);
             }}
             className={`p-1.5 rounded-lg transition-opacity ${
-              isFav ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+              isFav ? 'opacity-100' : 'opacity-70 md:opacity-0 md:group-hover:opacity-100'
             }`}
           >
             <Star
@@ -182,7 +182,7 @@ export default function DeskRecentsPanel({
           <p className="text-xs sm:text-sm text-slate-400 mt-1">Ext {ext}</p>
         </div>
         <div className="flex items-center gap-1.5 shrink-0">
-          <Phone className="w-5 h-5 text-desk-primary opacity-0 group-hover:opacity-100 transition-opacity" />
+          <Phone className="w-5 h-5 text-desk-primary opacity-70 md:opacity-0 md:group-hover:opacity-100 transition-opacity" />
           <button
             type="button"
             onClick={(e) => {

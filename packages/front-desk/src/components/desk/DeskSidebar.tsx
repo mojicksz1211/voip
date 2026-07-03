@@ -1,4 +1,4 @@
-import { Grid3X3, Clock, Building2, Bell, Settings } from 'lucide-react';
+import { LayoutDashboard, Grid3X3, Clock, Building2, Bell, Settings } from 'lucide-react';
 import type { DeskNav } from '../../utils/deskHelpers';
 
 interface DeskSidebarProps {
@@ -9,6 +9,7 @@ interface DeskSidebarProps {
 }
 
 const NAV_ITEMS: { id: DeskNav; icon: typeof Grid3X3; label: string }[] = [
+  { id: 'dashboard', icon: LayoutDashboard, label: 'Dashboard' },
   { id: 'keypad', icon: Grid3X3, label: 'Keypad' },
   { id: 'recents', icon: Clock, label: 'Recents' },
   { id: 'rooms', icon: Building2, label: 'Rooms' },

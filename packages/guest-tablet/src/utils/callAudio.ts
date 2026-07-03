@@ -1,4 +1,4 @@
-import { Capacitor, registerPlugin } from '@capacitor/core';
+import { Capacitor, registerPlugin, type PluginListenerHandle } from '@capacitor/core';
 import type { NativeRingtoneType } from '@hotel-voip/shared';
 import { telephonyAudio } from '@hotel-voip/shared';
 
@@ -19,6 +19,10 @@ interface CallAudioPlugin {
   playHangupSound(): Promise<void>;
   resetCallAudio(): Promise<void>;
   wakeScreen(): Promise<void>;
+  addListener(
+    eventName: 'handsetHook',
+    listenerFunc: () => void,
+  ): Promise<PluginListenerHandle>;
 }
 
 export const CallAudio = registerPlugin<CallAudioPlugin>('CallAudio');
@@ -96,4 +100,27 @@ export function applyCallAudioState(
     ringType: options?.ringType,
     withMic: options?.withMic ?? false,
   }).catch(() => {});
+}
+
+/** Retro 3.5mm handset hook / media button (Android KEYCODE_HEADSETHOOK). */
+export function subscribeHandsetHook(onPress: () => void): () => void {
+  if (!isAndroidNative) return () => {};
+
+  let handle: PluginListenerHandle | null = null;
+  let cancelled = false;
+
+  void CallAudio.addListener('handsetHook', () => {
+    onPress();
+  }).then((h) => {
+    if (cancelled) {
+      void h.remove();
+      return;
+    }
+    handle = h;
+  });
+
+  return () => {
+    cancelled = true;
+    void handle?.remove();
+  };
 }

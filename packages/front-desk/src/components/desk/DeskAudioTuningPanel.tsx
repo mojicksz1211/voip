@@ -149,7 +149,7 @@ export default function DeskAudioTuningPanel({ onApply }: DeskAudioTuningPanelPr
               <span className="text-sm font-semibold text-slate-800 block">Retro phone handset</span>
               <span className="text-xs text-slate-500 leading-relaxed">
                 Enable for 3.5mm retro receiver handsets (mic and earpiece in one piece). Reduces
-                hearing your own voice. Takes effect on the next call.
+                hearing your own voice. Hook button answers incoming calls or hangs up. Takes effect on the next call.
               </span>
             </span>
           </label>

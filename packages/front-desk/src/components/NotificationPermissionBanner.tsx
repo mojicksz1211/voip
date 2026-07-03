@@ -19,7 +19,7 @@ export default function NotificationPermissionBanner({
 
   if (permission === "denied" && showDeniedHint) {
     return (
-      <div className="mx-6 lg:mx-10 mt-3 mb-0 px-4 py-3 bg-rose-50 border border-rose-200 rounded-xl flex flex-col sm:flex-row sm:items-start gap-3 text-xs text-rose-900">
+      <div className="mx-4 md:mx-6 lg:mx-10 mt-3 mb-0 px-4 py-3 bg-rose-50 border border-rose-200 rounded-xl flex flex-col sm:flex-row sm:items-start gap-3 text-xs text-rose-900">
         <BellOff className="w-4 h-4 shrink-0 mt-0.5 text-rose-600" />
         <div className="flex-1 space-y-1">
           <p className="font-bold">Call notifications are blocked in the browser</p>
@@ -50,7 +50,7 @@ export default function NotificationPermissionBanner({
 
   if (permission === "default") {
     return (
-      <div className="mx-6 lg:mx-10 mt-3 mb-0 px-4 py-3 bg-amber-50 border border-amber-200 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      <div className="mx-4 md:mx-6 lg:mx-10 mt-3 mb-0 px-4 py-3 bg-amber-50 border border-amber-200 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="flex items-start gap-2 text-xs text-amber-900">
           <Bell className="w-4 h-4 shrink-0 mt-0.5" />
           <div>

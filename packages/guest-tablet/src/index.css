@@ -73,4 +73,17 @@ body,
   .animate-fadeIn {
     animation: fadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
   }
+
+  .safe-area-pt {
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+
+  .safe-area-pb {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  .safe-call-inset {
+    padding-top: max(4rem, env(safe-area-inset-top, 0px));
+    padding-bottom: max(2.5rem, env(safe-area-inset-bottom, 0px));
+  }
 }

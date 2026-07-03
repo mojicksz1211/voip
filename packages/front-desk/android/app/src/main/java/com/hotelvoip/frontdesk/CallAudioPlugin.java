@@ -19,6 +19,7 @@ import android.view.WindowManager;
 import androidx.core.content.ContextCompat;
 
 import com.getcapacitor.JSObject;
+import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
@@ -30,6 +31,7 @@ import android.util.Log;
 public class CallAudioPlugin extends Plugin {
 
     private static final String TAG = "HotelVoIPCallAudio";
+    private static CallAudioPlugin instance;
 
     /** Known OEM auto-start / background-launch management screens, tried in order. */
     private static final String[][] AUTOSTART_COMPONENTS = {
@@ -55,6 +57,43 @@ public class CallAudioPlugin extends Plugin {
     private final NativeCallRinger nativeCallRinger = new NativeCallRinger();
     private final Object audioLock = new Object();
     private final Object callServiceLock = new Object();
+
+    @Override
+    public void load() {
+        super.load();
+        instance = this;
+    }
+
+    @Override
+    protected void handleOnDestroy() {
+        if (instance == this) {
+            instance = null;
+        }
+        super.handleOnDestroy();
+    }
+
+    public static boolean dispatchHandsetHookKey(int keyCode, int action, int repeatCount) {
+        if (action != android.view.KeyEvent.ACTION_DOWN || repeatCount != 0) {
+            return false;
+        }
+        if (keyCode != android.view.KeyEvent.KEYCODE_HEADSETHOOK
+                && keyCode != android.view.KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE
+                && keyCode != android.view.KeyEvent.KEYCODE_CALL) {
+            return false;
+        }
+        notifyHandsetHook();
+        return true;
+    }
+
+    private static void notifyHandsetHook() {
+        if (instance == null) {
+            return;
+        }
+        JSObject data = new JSObject();
+        data.put("action", "press");
+        instance.notifyListeners("handsetHook", data);
+        Log.i(TAG, "handsetHook press");
+    }
 
     private void runAudioOnUiThread(PluginCall call, Runnable task) {
         Runnable wrapped = () -> {

@@ -1,3 +1,4 @@
+import { useState, useRef, useEffect } from 'react';
 import { ChevronDown } from 'lucide-react';
 import type { OperatorStatus } from '../../utils/deskHelpers';
 import { useDeskConfirm } from '../../hooks/useDeskConfirm';
@@ -22,6 +23,23 @@ export default function DeskTopBar({
   isRegistered = true,
 }: DeskTopBarProps) {
   const { confirm, dialog } = useDeskConfirm();
+  const [statusOpen, setStatusOpen] = useState(false);
+  const statusRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!statusOpen) return;
+    const close = (e: MouseEvent | TouchEvent) => {
+      if (statusRef.current && !statusRef.current.contains(e.target as Node)) {
+        setStatusOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', close);
+    document.addEventListener('touchstart', close);
+    return () => {
+      document.removeEventListener('mousedown', close);
+      document.removeEventListener('touchstart', close);
+    };
+  }, [statusOpen]);
 
   const confirmEnableDnd = () =>
     confirm({
@@ -64,7 +82,7 @@ export default function DeskTopBar({
   };
 
   return (
-    <header className="min-h-14 py-2 px-4 sm:px-5 flex items-center justify-between bg-white border-b border-slate-200 shrink-0 z-20">
+    <header className="min-h-14 py-2 px-4 sm:px-5 flex items-center justify-between bg-white border-b border-slate-200 shrink-0 z-20 safe-area-pt">
       <div className="flex items-center gap-3 min-w-0">
         <img
           src="/desk-icon.svg"
@@ -105,10 +123,13 @@ export default function DeskTopBar({
           DND{dnd ? ' ON' : ''}
         </button>
 
-        <div className="relative group">
+        <div className="relative" ref={statusRef}>
           <button
             type="button"
+            onClick={() => setStatusOpen((open) => !open)}
             className="flex items-center gap-2 pl-2.5 pr-1.5 py-1.5 rounded-xl hover:bg-slate-50 transition-colors"
+            aria-expanded={statusOpen}
+            aria-haspopup="listbox"
           >
             <span
               className={`w-3 h-3 rounded-full ${
@@ -125,12 +146,19 @@ export default function DeskTopBar({
             </span>
             <ChevronDown className="w-4 h-4 text-slate-400" />
           </button>
-          <div className="absolute right-0 top-full mt-1 w-40 bg-white rounded-xl border border-slate-200 shadow-lg py-1 hidden group-hover:block z-30">
+          <div
+            className={`absolute right-0 top-full mt-1 w-40 bg-white rounded-xl border border-slate-200 shadow-lg py-1 z-30 ${
+              statusOpen ? 'block' : 'hidden'
+            }`}
+          >
             {(['online', 'dnd', 'offline'] as OperatorStatus[]).map((s) => (
               <button
                 key={s}
                 type="button"
-                onClick={() => void handleStatusChange(s)}
+                onClick={() => {
+                  void handleStatusChange(s);
+                  setStatusOpen(false);
+                }}
                 className={`w-full text-left px-4 py-2 text-sm hover:bg-slate-50 capitalize ${
                   operatorStatus === s ? 'text-desk-primary font-semibold' : 'text-slate-600'
                 }`}

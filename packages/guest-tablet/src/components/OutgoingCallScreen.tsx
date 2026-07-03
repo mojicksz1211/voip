@@ -26,7 +26,7 @@ export default function OutgoingCallScreen({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[200] flex flex-col items-center justify-between select-none animate-fadeIn bg-gradient-to-b from-[#0a1f44] via-[#0b1e3f] to-[#08152e] text-white px-6 pt-16 pb-10"
+      className="fixed inset-0 z-[200] flex flex-col items-center justify-between select-none animate-fadeIn bg-gradient-to-b from-[#0a1f44] via-[#0b1e3f] to-[#08152e] text-white px-6 safe-call-inset"
       role="dialog"
       aria-modal="true"
       aria-labelledby="guest-outgoing-call-title"

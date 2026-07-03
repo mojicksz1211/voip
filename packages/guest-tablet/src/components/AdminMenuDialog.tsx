@@ -35,7 +35,7 @@ export default function AdminMenuDialog({
       >
         <h3 className="text-base font-bold text-slate-900 mb-1">Staff Admin</h3>
         <p className="text-sm text-slate-600 mb-4">Choose an action for this tablet.</p>
-        <div className="space-y-2">
+        <div className="space-y-2 max-h-[60vh] overflow-y-auto">
           <button
             type="button"
             onClick={onToggleRetroHandset}
@@ -50,7 +50,7 @@ export default function AdminMenuDialog({
                 Retro phone handset {retroHandset ? 'ON' : 'OFF'}
               </p>
               <p className="text-[11px] text-slate-500">
-                For 3.5mm retro receiver — stops hearing your own voice. Next call.
+                For 3.5mm retro receiver — better audio. Hook button answers or ends calls.
               </p>
             </div>
           </button>

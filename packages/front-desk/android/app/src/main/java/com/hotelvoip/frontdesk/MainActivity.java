@@ -4,6 +4,7 @@ import android.Manifest;
 import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Bundle;
+import android.view.KeyEvent;
 import android.view.View;
 import android.view.WindowInsets;
 import android.view.WindowInsetsController;
@@ -56,6 +57,15 @@ public class MainActivity extends BridgeActivity {
         if (hasFocus) {
             enableImmersiveFullscreen();
         }
+    }
+
+    @Override
+    public boolean dispatchKeyEvent(KeyEvent event) {
+        if (CallAudioPlugin.dispatchHandsetHookKey(
+                event.getKeyCode(), event.getAction(), event.getRepeatCount())) {
+            return true;
+        }
+        return super.dispatchKeyEvent(event);
     }
 
     @Override
