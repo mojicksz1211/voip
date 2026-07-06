@@ -18,6 +18,11 @@ export interface LiveKitCallManagerOptions {
   remotePlaybackVolume?: number;
   /** When set, Android uses LiveKit-owned mic with these constraints (smoother encode). */
   liveKitMicCapture?: Record<string, boolean> | (() => Record<string, boolean>);
+  /**
+   * Android: bind capture to wired headset mic. Guest: true. Front desk: only when retro handset.
+   * Desk tablets often use the jack for listen-only; forcing headset mic breaks WebRTC TX on Lenovo.
+   */
+  preferWiredCaptureDevice?: boolean;
 }
 
 const VOICE_AUDIO_PUBLISH = {
@@ -29,7 +34,7 @@ const VOICE_AUDIO_PUBLISH = {
 
 /** Android wired headsets: DTX comfort noise sounds like continuous static/hiss. */
 const ANDROID_VOICE_PUBLISH = {
-  audioPreset: AudioPresets.speech,
+  ...AudioPresets.speech,
   forceStereo: false,
   dtx: false,
   red: true,
@@ -37,7 +42,7 @@ const ANDROID_VOICE_PUBLISH = {
 
 /** Retro handset: continuous speech encode, no RED/DTX artifacts on cheap receivers. */
 const RETRO_HANDSET_AUDIO_PUBLISH = {
-  audioPreset: AudioPresets.speech,
+  ...AudioPresets.speech,
   forceStereo: false,
   dtx: false,
   red: false,
@@ -173,6 +178,11 @@ export class LiveKitCallManager {
 
     this.options?.onRemoteAudioStart?.();
 
+    // Show "In call" as soon as remote audio is playing; local mic may still be publishing (AEC defer).
+    if (this.roomConnected) {
+      this.onConnectionStateChange?.(true);
+    }
+
     void this.tryPublishDeferredMic();
 
     if (!isAndroidUserAgent()) {
@@ -246,6 +256,8 @@ export class LiveKitCallManager {
   private async androidMicCaptureWithDevice(options?: LiveKitCallManagerOptions) {
     const base = androidLiveKitMicCapture(options);
     if (!isAndroidUserAgent()) return base;
+    const preferWired = options?.preferWiredCaptureDevice ?? true;
+    if (!preferWired) return base;
     const deviceId = await resolvePreferredWiredMicDeviceId();
     return mergeMicCaptureWithDevice(base, deviceId);
   }
@@ -255,30 +267,38 @@ export class LiveKitCallManager {
 
     const externalStream = this.options?.getLocalStream?.();
     const externalTrack = externalStream?.getAudioTracks()[0];
+    const primedButMuted =
+      externalTrack?.readyState === 'live' && externalTrack.enabled === false;
     const deskCapture = await this.androidMicCaptureWithDevice(this.options);
     const publishOptions = publishOptionsForCapture(deskCapture);
 
     if (externalTrack?.readyState === 'live') {
       if (isAndroidUserAgent()) {
         await this.options?.beforeAcquireMic?.();
+        // Front desk primes mic during ring with track.enabled=false; publishing that
+        // track sends silence to the guest. Release and open a fresh LiveKit-owned mic.
+        if (primedButMuted) {
+          releaseMicrophoneStream(externalStream);
+        } else {
+          await this.room.localParticipant.setMicrophoneEnabled(
+            true,
+            deskCapture,
+            publishOptions,
+          );
+          releaseMicrophoneStream(externalStream);
+          return;
+        }
+      } else {
+        // Desktop: pre-connect mic lacks remote playback reference for AEC — use LiveKit mic.
+        releaseMicrophoneStream(externalStream);
+        await this.options?.beforeAcquireMic?.();
         await this.room.localParticipant.setMicrophoneEnabled(
           true,
-          deskCapture,
-          publishOptions,
+          DESKTOP_VOICE_CAPTURE,
+          VOICE_AUDIO_PUBLISH,
         );
-        releaseMicrophoneStream(externalStream);
         return;
       }
-
-      // Desktop: pre-connect mic lacks remote playback reference for AEC — use LiveKit mic.
-      releaseMicrophoneStream(externalStream);
-      await this.options?.beforeAcquireMic?.();
-      await this.room.localParticipant.setMicrophoneEnabled(
-        true,
-        DESKTOP_VOICE_CAPTURE,
-        VOICE_AUDIO_PUBLISH,
-      );
-      return;
     }
 
     await this.options?.beforeAcquireMic?.();
@@ -344,6 +364,7 @@ export class LiveKitCallManager {
 
       if (connectOptions?.deferPublish) {
         await this.room.startAudio();
+        this.attachExistingRemoteAudio();
         return;
       }
 
@@ -453,6 +474,9 @@ export class LiveKitCallManager {
 
   setSpeakerMuted(muted: boolean) {
     this.speakerMuted = muted;
+    // Android: routing is native (earpiece vs loudspeaker); never mute WebRTC playback.
+    if (isAndroidUserAgent()) return;
+
     const playbackVolume = this.remotePlaybackVolume;
     for (const track of this.remoteAudioTracks) {
       track.setVolume(muted ? 0 : playbackVolume);
@@ -465,7 +489,7 @@ export class LiveKitCallManager {
 
   setRemotePlaybackVolume(volume: number) {
     this.remotePlaybackVolume = Math.max(0, Math.min(1, volume));
-    if (this.speakerMuted) return;
+    if (this.speakerMuted && !isAndroidUserAgent()) return;
     for (const track of this.remoteAudioTracks) {
       track.setVolume(this.remotePlaybackVolume);
     }

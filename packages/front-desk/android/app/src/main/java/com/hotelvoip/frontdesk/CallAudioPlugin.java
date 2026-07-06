@@ -5,6 +5,7 @@ import android.app.NotificationManager;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.media.AudioDeviceInfo;
 import android.media.AudioAttributes;
 import android.media.AudioFocusRequest;
 import android.media.AudioManager;
@@ -26,6 +27,8 @@ import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
 
 import android.util.Log;
+
+import java.util.concurrent.Executor;
 
 @CapacitorPlugin(name = "CallAudio")
 public class CallAudioPlugin extends Plugin {
@@ -57,6 +60,18 @@ public class CallAudioPlugin extends Plugin {
     private final NativeCallRinger nativeCallRinger = new NativeCallRinger();
     private final Object audioLock = new Object();
     private final Object callServiceLock = new Object();
+
+    /** User toggled loudspeaker on during connected call. */
+    private boolean connectedForceSpeaker = false;
+    private boolean connectedPhaseActive = false;
+    private AudioManager.OnCommunicationDeviceChangedListener communicationDeviceListener;
+    private final Executor mainExecutor = command -> {
+        if (getActivity() != null) {
+            getActivity().runOnUiThread(command);
+        } else {
+            new Handler(Looper.getMainLooper()).post(command);
+        }
+    };
 
     @Override
     public void load() {
@@ -379,6 +394,8 @@ public class CallAudioPlugin extends Plugin {
         String phase = call.getString("phase", "idle");
         String ringType = call.getString("ringType", null);
         boolean withMic = call.getBoolean("withMic", false);
+        boolean forceSpeaker = call.getBoolean("forceSpeaker", false);
+        boolean reassertOnly = call.getBoolean("reassertOnly", false);
 
         runAudioOnUiThread(call, () -> {
             AudioManager audioManager = (AudioManager) getContext().getSystemService(Context.AUDIO_SERVICE);
@@ -391,7 +408,7 @@ public class CallAudioPlugin extends Plugin {
                     applyRingingState(audioManager, ringType, withMic);
                     break;
                 case "connected":
-                    applyConnectedState(audioManager);
+                    applyConnectedState(audioManager, forceSpeaker, reassertOnly);
                     break;
                 case "idle":
                 default:
@@ -408,8 +425,12 @@ public class CallAudioPlugin extends Plugin {
             if (audioManager != null) {
                 nativeCallRinger.stop();
                 requestVoiceFocus(audioManager);
-                CallAudioRouting.prepareConnectedAudio(audioManager, false);
+                connectedPhaseActive = true;
+                connectedForceSpeaker = true;
+                registerCommunicationDeviceListener(audioManager);
+                CallAudioRouting.prepareConnectedAudio(audioManager, false, true);
                 applyMaxCallVolumes(audioManager);
+                CallProximityScreen.release(getActivity());
             }
         });
     }
@@ -428,10 +449,21 @@ public class CallAudioPlugin extends Plugin {
             if ("ringing".equals(phase)) {
                 routeRingingCallAudio(audioManager, withMic);
             } else {
+                boolean wired = CallAudioRouting.isWiredHeadsetConnected(audioManager);
+                boolean effectiveSpeaker = !wired;
+                boolean proximityNeedsUpdate = !connectedPhaseActive || connectedForceSpeaker != effectiveSpeaker;
+
                 nativeCallRinger.stop();
                 requestVoiceFocus(audioManager);
-                CallAudioRouting.prepareConnectedAudio(audioManager, true);
+                connectedPhaseActive = true;
+                connectedForceSpeaker = effectiveSpeaker;
+                registerCommunicationDeviceListener(audioManager);
+                CallAudioRouting.prepareDeskConnectedAudio(audioManager, true, effectiveSpeaker);
                 applyMaxCallVolumes(audioManager);
+
+                if (proximityNeedsUpdate) {
+                    updateProximityScreen(effectiveSpeaker);
+                }
             }
         });
     }
@@ -520,8 +552,13 @@ public class CallAudioPlugin extends Plugin {
     }
 
     private void applyIdleState(AudioManager audioManager) {
+        CallProximityScreen.release(getActivity());
+        CallAudioRouting.resetConnectedReassertThrottle();
         nativeCallRinger.stop();
         abandonRingFocus(audioManager);
+        connectedPhaseActive = false;
+        connectedForceSpeaker = false;
+        unregisterCommunicationDeviceListener(audioManager);
         if (audioManager == null) {
             return;
         }
@@ -533,6 +570,11 @@ public class CallAudioPlugin extends Plugin {
     }
 
     private void applyRingingState(AudioManager audioManager, String ringType, boolean withMic) {
+        CallProximityScreen.release(getActivity());
+        connectedPhaseActive = false;
+        connectedForceSpeaker = false;
+        unregisterCommunicationDeviceListener(audioManager);
+
         if (withMic) {
             requestVoiceFocus(audioManager);
             CallAudioRouting.forceSpeakerForRing(audioManager, false);
@@ -547,20 +589,90 @@ public class CallAudioPlugin extends Plugin {
         }
     }
 
-    private void applyConnectedState(AudioManager audioManager) {
+    private void applyConnectedState(AudioManager audioManager, boolean forceSpeaker, boolean reassertOnly) {
+        boolean wired = CallAudioRouting.isWiredHeadsetConnected(audioManager);
+        boolean effectiveSpeaker = forceSpeaker || !wired;
+
+        if (reassertOnly && connectedPhaseActive && connectedForceSpeaker == effectiveSpeaker) {
+            CallAudioRouting.reassertConnectedAudio(audioManager, effectiveSpeaker);
+            return;
+        }
+
+        boolean enteringConnected = !connectedPhaseActive;
+        boolean speakerChanged = connectedForceSpeaker != effectiveSpeaker;
+
         nativeCallRinger.stop();
         requestVoiceFocus(audioManager);
-        CallAudioRouting.prepareConnectedAudio(audioManager, true);
+        connectedPhaseActive = true;
+        connectedForceSpeaker = effectiveSpeaker;
+        registerCommunicationDeviceListener(audioManager);
+        CallAudioRouting.prepareDeskConnectedAudio(audioManager, true, effectiveSpeaker);
         applyMaxCallVolumes(audioManager);
+
+        if (enteringConnected || speakerChanged) {
+            updateProximityScreen(effectiveSpeaker);
+        }
     }
 
     private void routeRingingCallAudio(AudioManager audioManager, boolean withMic) {
+        CallProximityScreen.release(getActivity());
+        connectedPhaseActive = false;
+        connectedForceSpeaker = false;
+        unregisterCommunicationDeviceListener(audioManager);
+
         if (withMic) {
             requestVoiceFocus(audioManager);
             CallAudioRouting.forceSpeakerForRing(audioManager, false);
         } else {
             CallAudioRouting.forceSpeakerForRing(audioManager);
         }
+    }
+
+    private void updateProximityScreen(boolean forceSpeaker) {
+        if (getActivity() == null) {
+            return;
+        }
+        if (forceSpeaker) {
+            CallProximityScreen.release(getActivity());
+        } else {
+            CallProximityScreen.acquire(getActivity());
+        }
+    }
+
+    private void registerCommunicationDeviceListener(AudioManager audioManager) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
+            return;
+        }
+        if (communicationDeviceListener != null) {
+            return;
+        }
+        communicationDeviceListener = device -> {
+            if (!connectedPhaseActive || connectedForceSpeaker || audioManager == null) {
+                return;
+            }
+            if (device != null && device.getType() == AudioDeviceInfo.TYPE_BUILTIN_SPEAKER) {
+                if (!CallAudioRouting.hasBuiltInEarpiece(audioManager)) {
+                    return;
+                }
+                Log.i(TAG, "WebRTC switched to speaker — re-routing to earpiece");
+                synchronized (audioLock) {
+                    CallAudioRouting.prepareConnectedAudio(audioManager, true, false);
+                }
+            }
+        };
+        audioManager.addOnCommunicationDeviceChangedListener(mainExecutor, communicationDeviceListener);
+    }
+
+    private void unregisterCommunicationDeviceListener(AudioManager audioManager) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
+            return;
+        }
+        if (communicationDeviceListener == null || audioManager == null) {
+            communicationDeviceListener = null;
+            return;
+        }
+        audioManager.removeOnCommunicationDeviceChangedListener(communicationDeviceListener);
+        communicationDeviceListener = null;
     }
 
     private boolean hasMicPermission() {

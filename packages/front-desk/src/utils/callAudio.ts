@@ -20,6 +20,9 @@ interface CallAudioPlugin {
     phase: CallAudioNativePhase;
     ringType?: NativeRingtoneType;
     withMic?: boolean;
+    forceSpeaker?: boolean;
+    reassertOnly?: boolean;
+    intercomSpeaker?: boolean;
   }): Promise<void>;
   startRingtone(options: { type: NativeRingtoneType }): Promise<void>;
   stopRingtone(): Promise<void>;
@@ -172,7 +175,7 @@ export async function openOverlaySettings(): Promise<boolean> {
   }
 }
 
-/** Ring on built-in speaker; switch to headset on connected when jack is plugged. */
+/** Ring on built-in speaker; connected call uses earpiece unless jack is plugged or speaker is toggled on. */
 export function routeCallAudio(phase: CallAudioPhase, withMic = false): void {
   if (!isAndroidNative) return;
   void CallAudio.routeCallAudio({ phase, withMic }).catch(() => {});
@@ -208,16 +211,68 @@ export function wakeScreenForCall(): void {
   void CallAudio.wakeScreen().catch(() => {});
 }
 
+/** Route active call audio to the built-in loudspeaker (user enabled speaker in UI). */
+export function enableSpeakerForCall(): void {
+  if (!isAndroidNative) return;
+  void CallAudio.enableSpeaker().catch(() => {});
+}
+
+/** Re-apply connected routing after LiveKit/WebRTC starts (can override AudioManager). */
+const CONNECTED_AUDIO_REASSERT_MS = [0, 1000] as const;
+/** Full routing resync after mic publish — light reassert is not enough on desk + wired jack. */
+const CONNECTED_AUDIO_FULL_RESYNC_MS = [400, 1500, 3000] as const;
+
+let reassertGeneration = 0;
+let resyncGeneration = 0;
+
+export function reassertConnectedCallAudio(withMic = false, forceSpeaker = false): () => void {
+  if (!isAndroidNative) return () => {};
+  const generation = ++reassertGeneration;
+  const timers = CONNECTED_AUDIO_REASSERT_MS.map((delay) =>
+    window.setTimeout(() => {
+      if (generation !== reassertGeneration) return;
+      applyCallAudioState('connected', { withMic, forceSpeaker, reassertOnly: true });
+    }, delay),
+  );
+  return () => {
+    timers.forEach((id) => window.clearTimeout(id));
+  };
+}
+
+/** Full prepareConnectedAudio passes — same fix as toggling speaker off/on. */
+export function resyncConnectedCallAudio(withMic = false, forceSpeaker = false): () => void {
+  if (!isAndroidNative) return () => {};
+  const generation = ++resyncGeneration;
+  const timers = CONNECTED_AUDIO_FULL_RESYNC_MS.map((delay) =>
+    window.setTimeout(() => {
+      if (generation !== resyncGeneration) return;
+      applyCallAudioState('connected', { withMic, forceSpeaker, reassertOnly: false });
+    }, delay),
+  );
+  return () => {
+    timers.forEach((id) => window.clearTimeout(id));
+  };
+}
+
 /** Single native call — avoids async stop/start races between plugin methods. */
 export function applyCallAudioState(
   phase: CallAudioNativePhase,
-  options?: { ringType?: NativeRingtoneType; withMic?: boolean },
+  options?: {
+    ringType?: NativeRingtoneType;
+    withMic?: boolean;
+    forceSpeaker?: boolean;
+    reassertOnly?: boolean;
+    intercomSpeaker?: boolean;
+  },
 ): void {
   if (!isAndroidNative) return;
   void CallAudio.applyCallState({
     phase,
     ringType: options?.ringType,
     withMic: options?.withMic ?? false,
+    forceSpeaker: options?.forceSpeaker ?? false,
+    reassertOnly: options?.reassertOnly ?? false,
+    intercomSpeaker: options?.intercomSpeaker ?? false,
   }).catch(() => {});
 }
 

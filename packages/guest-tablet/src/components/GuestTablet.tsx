@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Capacitor } from "@capacitor/core";
 import { 
-  Phone, PhoneOff, PhoneCall, Volume2, VolumeX, Mic, MicOff, 
+  Phone, PhoneOff, PhoneCall, 
   HelpCircle, Coffee, ShowerHead, Sparkles, Wrench, AlertTriangle, 
   Clock, Check, Layers, History, MessageSquare, Hand
 } from "lucide-react";
@@ -87,7 +87,7 @@ export default function GuestTablet({
   onToggleSpeaker = () => {},
 }: GuestTabletProps) {
   const isNative = Capacitor.isNativePlatform();
-  const { confirm, dialog } = useGuestConfirm();
+  const { confirm, dismissPending, dialog } = useGuestConfirm();
   const { requirePin, pinDialog } = useAdminPin();
   const [activeTab, setActiveTab] = useState<"intercom" | "requests">("intercom");
   
@@ -181,15 +181,23 @@ export default function GuestTablet({
     if (ok) handleCall("911");
   };
 
-  // Ending or declining a call is a single tap — no confirmation dialog, so it
-  // works even while the full-screen call screen is on top.
-  const handleDeclineWithConfirm = (callId: string) => {
+  // Ending or declining a call is a single tap — no confirmation dialog.
+  const handleDecline = (callId: string) => {
     onDeclineCall(callId);
   };
 
-  const handleHangupWithConfirm = (callId: string) => {
+  const handleHangup = (callId: string) => {
     onHangupCall(callId);
   };
+
+  const isCallActive =
+    currentCall?.status === "ringing" || currentCall?.status === "connected";
+
+  useEffect(() => {
+    if (isCallActive) {
+      dismissPending();
+    }
+  }, [isCallActive, currentCall?.callId, dismissPending]);
 
   const handleUnlinkWithConfirm = async (skipPin = false) => {
     if (isNative && !skipPin) {
@@ -390,7 +398,7 @@ export default function GuestTablet({
             peerName={currentCall.fromName}
             peerExt={currentCall.fromExt}
             onAnswer={() => onAnswerCall(currentCall.callId)}
-            onDecline={() => void handleDeclineWithConfirm(currentCall.callId)}
+            onDecline={() => void handleDecline(currentCall.callId)}
           />
         )}
 
@@ -400,7 +408,7 @@ export default function GuestTablet({
           <OutgoingCallScreen
             peerName={currentCall.toName}
             peerExt={currentCall.toExt}
-            onCancel={() => void handleHangupWithConfirm(currentCall.callId)}
+            onCancel={() => void handleHangup(currentCall.callId)}
           />
         )}
 
@@ -417,7 +425,7 @@ export default function GuestTablet({
           isVoiceConnected={isVoiceConnected}
           onToggleMic={onToggleMic}
           onToggleSpeaker={onToggleSpeaker}
-          onHangup={() => void handleHangupWithConfirm(currentCall.callId)}
+          onHangup={() => void handleHangup(currentCall.callId)}
         />
       )}
 
@@ -697,218 +705,74 @@ export default function GuestTablet({
 
         {/* Right Side Content (Call Status / Requests Backlog tracker Sidebar) */}
         <div className="w-full lg:w-72 bg-slate-50 border-t lg:border-t-0 lg:border-l border-slate-200 p-4 flex flex-col justify-between shrink-0 min-h-[200px] sm:min-h-[240px] lg:min-h-0 select-none">
-          
-          {/* ACTIVE CALL PANEL SCREEN Overlay */}
-          {currentCall ? (
-            <div className="flex-1 bg-slate-900 text-white rounded-xl p-4 flex flex-col justify-between overflow-hidden shadow-lg border border-slate-800 transition-all">
-              
-              {/* Call Status Title */}
-              <div className="text-center space-y-1">
-                <div className="flex items-center justify-center gap-1 text-[10px] font-mono uppercase font-extrabold text-[#fda4af] leading-none tracking-widest">
-                  <span className="w-2 h-2 rounded-full bg-red-500 animate-ping" />
-                  <span>
-                    {currentCall.status === "ringing" ? "SIP INVITING / RINGING" : "CONNECTED / ACTIVE CALL"}
-                  </span>
-                </div>
-                
-                <h6 className="text-[17px] font-bold text-slate-100 truncate max-w-full">
-                  {currentCall.fromExt === roomNum ? currentCall.toName : currentCall.fromName}
-                </h6>
-                <p className="text-[11px] font-mono text-slate-400">
-                  Room Extension: {currentCall.fromExt === roomNum ? currentCall.toExt : currentCall.fromExt}
-                </p>
-              </div>
+          <div className="flex-1 flex flex-col justify-between min-h-0">
+            {/* Request Status Monitor */}
+            <div>
+              <h6 className="text-[10px] font-mono font-bold text-slate-400 mb-2 uppercase tracking-widest flex items-center gap-1">
+                <History className="w-3.5 h-3.5" />
+                <span>Current Requests</span>
+              </h6>
 
-              {/* CSS Pulse Waves Visualizer */}
-              <div className="my-5 flex justify-center items-center h-16">
-                {currentCall.status === "connected" ? (
-                  <div className="flex items-end justify-center gap-1 h-12 w-full px-4">
-                    <span className="w-1.5 bg-indigo-500 rounded-full animate-audio-bar-1 h-4" />
-                    <span className="w-1.5 bg-violet-500 rounded-full animate-audio-bar-2 h-8" />
-                    <span className="w-1.5 bg-emerald-550 bg-emerald-500 rounded-full animate-audio-bar-3 h-12" />
-                    <span className="w-1.5 bg-indigo-505 bg-indigo-500 rounded-full animate-audio-bar-4 h-6" />
-                    <span className="w-1.5 bg-indigo-500 rounded-full animate-audio-bar-2 h-9" />
-                    <span className="w-1.5 bg-violet-400 rounded-full animate-audio-bar-3 h-11" />
-                    <span className="w-1.5 bg-emerald-500 rounded-full animate-audio-bar-1 h-5" />
+              <div className="space-y-2 overflow-y-auto max-h-[160px] pr-1">
+                {requests.filter(r => r.roomNumber === roomNum).length === 0 ? (
+                  <div className="p-3 border border-dashed rounded-lg bg-white border-slate-200 text-center text-[10px] font-mono text-slate-400">
+                    No active requests for this room.
                   </div>
                 ) : (
-                  <div className="relative flex items-center justify-center">
-                    <div className="w-14 h-14 bg-indigo-550/20 bg-indigo-500/20 border border-indigo-500/40 rounded-full animate-ripple absolute" />
-                    <div className="w-10 h-10 bg-indigo-500/40 rounded-full flex items-center justify-center">
-                      <PhoneCall className="w-5 h-5 text-white animate-bounce" />
-                    </div>
-                  </div>
-                )}
-              </div>
+                  requests.filter(r => r.roomNumber === roomNum).map((req) => {
+                    let statusText = "Pending";
+                    let statusColor = "bg-amber-500 text-white";
+                    if (req.status === "processing") {
+                      statusText = "Processing";
+                      statusColor = "bg-blue-650 text-white";
+                    } else if (req.status === "done") {
+                      statusText = "Done!";
+                      statusColor = "bg-emerald-600 text-white";
+                    }
 
-              {/* Call timing duration / Answer screen if ringing-receiver */}
-              <div className="space-y-4">
-                {currentCall.status === "connected" && (
-                  <div className="p-3 bg-slate-950 border border-slate-800 rounded-xl space-y-2 mb-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[9px] font-mono text-slate-500 uppercase">Live VoIP Audio (LiveKit)</span>
-                      <span className={`w-2 h-2 rounded-full ${isVoiceConnected ? "bg-emerald-500 animate-pulse" : "bg-amber-500 animate-pulse"}`} />
-                    </div>
-                    <div className="flex items-center justify-center gap-2 py-2">
-                      <Mic className={`w-4 h-4 ${isVoiceConnected ? "text-emerald-400" : "text-amber-400"}`} />
-                      <span className={`text-xs font-bold ${isVoiceConnected ? "text-emerald-400" : "text-amber-300"}`}>
-                        {isVoiceConnected ? "LIVE — Speak directly" : "Connecting audio..."}
-                      </span>
-                    </div>
-                    <p className="text-[9px] text-slate-500 text-center leading-relaxed">
-                      Real voice over the local network. No TTS — direct microphone and speaker.
-                    </p>
-                    {voiceError && (
-                      <p className="text-[10px] text-rose-400 text-center">{voiceError}</p>
-                    )}
-                  </div>
-                )}
-
-                {currentCall.toExt === roomNum && currentCall.status === "ringing" ? (
-                  // Incoming call - show Answer or Reject
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      onClick={() => void handleDeclineWithConfirm(currentCall.callId)}
-                      className="py-2 px-3 bg-rose-650 hover:bg-rose-750 text-white rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1 shadow"
-                    >
-                      <PhoneOff className="w-3.5 h-3.5" />
-                      <span>Decline</span>
-                    </button>
-                    <button
-                      onClick={() => onAnswerCall(currentCall.callId)}
-                      className="py-2 px-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1 shadow blink-emerald"
-                    >
-                      <Phone className="w-3.5 h-3.5" />
-                      <span>Answer</span>
-                    </button>
-                  </div>
-                ) : (
-                  // Outgoing call or Active call
-                  <div className="space-y-2">
-                    {currentCall.status === "connected" && (
-                      <div className="flex justify-center gap-6 py-2 border-t border-b border-slate-800">
-                        <button
-                          type="button"
-                          onClick={onToggleMic}
-                          className="flex flex-col items-center gap-1"
-                        >
-                          <span
-                            className={`p-2.5 rounded-full border transition-all ${
-                              isMicMuted
-                                ? "bg-red-950/40 border-red-500/50 text-red-400"
-                                : "bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-300"
-                            }`}
-                          >
-                            {isMicMuted ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
+                    return (
+                      <div key={req.id} className="p-2 border bg-white rounded-lg border-slate-200 text-[11px] font-sans flex flex-col gap-1">
+                        <div className="flex justify-between items-start">
+                          <span className="font-bold text-slate-700 uppercase">
+                            {req.requestType === "towels" ? "Towels" :
+                             req.requestType === "water" ? "Bottled Water" :
+                             req.requestType === "cleanup" ? "Room Cleanup" :
+                             req.requestType === "laundry" ? "Laundry" :
+                             req.requestType === "wakeup" ? "Wake-up Call" : "Request"}
                           </span>
-                          <span className="text-[9px] font-bold text-slate-500 uppercase">
-                            {isMicMuted ? "Unmute" : "Mute"}
+                          <span className={`px-1.5 py-0.2 rounded-[4px] text-[8px] font-mono font-bold leading-none ${statusColor}`}>
+                            {statusText}
                           </span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={onToggleSpeaker}
-                          className="flex flex-col items-center gap-1"
-                        >
-                          <span
-                            className={`p-2.5 rounded-full border transition-all ${
-                              isSpeakerMuted
-                                ? "bg-amber-950/40 border-amber-500/50 text-amber-400"
-                                : "bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-300"
-                            }`}
-                          >
-                            {isSpeakerMuted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
-                          </span>
-                          <span className="text-[9px] font-bold text-slate-500 uppercase">
-                            {isSpeakerMuted ? "Speaker Off" : "Speaker"}
-                          </span>
-                        </button>
-                      </div>
-                    )}
-
-                    <button
-                      onClick={() => void handleHangupWithConfirm(currentCall.callId)}
-                      className="w-full py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-bold font-sans transition-all flex items-center justify-center gap-1.5 shadow"
-                    >
-                      <PhoneOff className="w-4 h-4" />
-                      <span>Hang Up</span>
-                    </button>
-                  </div>
-                )}
-              </div>
-            </div>
-          ) : (
-            // STATIC NO-CALL PLACEHOLDER
-            <div className="flex-1 flex flex-col justify-between min-h-0">
-              
-              {/* Request Status Monitor */}
-              <div>
-                <h6 className="text-[10px] font-mono font-bold text-slate-400 mb-2 uppercase tracking-widest flex items-center gap-1">
-                  <History className="w-3.5 h-3.5" />
-                  <span>Current Requests</span>
-                </h6>
-
-                <div className="space-y-2 overflow-y-auto max-h-[160px] pr-1">
-                  {requests.filter(r => r.roomNumber === roomNum).length === 0 ? (
-                    <div className="p-3 border border-dashed rounded-lg bg-white border-slate-200 text-center text-[10px] font-mono text-slate-400">
-                      No active requests for this room.
-                    </div>
-                  ) : (
-                    requests.filter(r => r.roomNumber === roomNum).map((req) => {
-                      let statusText = "Pending";
-                      let statusColor = "bg-amber-500 text-white";
-                      if (req.status === "processing") {
-                        statusText = "Processing";
-                        statusColor = "bg-blue-650 text-white";
-                      } else if (req.status === "done") {
-                        statusText = "Done!";
-                        statusColor = "bg-emerald-600 text-white";
-                      }
-
-                      return (
-                        <div key={req.id} className="p-2 border bg-white rounded-lg border-slate-200 text-[11px] font-sans flex flex-col gap-1">
-                          <div className="flex justify-between items-start">
-                            <span className="font-bold text-slate-700 uppercase">
-                              {req.requestType === "towels" ? "Towels" :
-                               req.requestType === "water" ? "Bottled Water" :
-                               req.requestType === "cleanup" ? "Room Cleanup" :
-                               req.requestType === "laundry" ? "Laundry" :
-                               req.requestType === "wakeup" ? "Wake-up Call" : "Request"}
-                            </span>
-                            <span className={`px-1.5 py-0.2 rounded-[4px] text-[8px] font-mono font-bold leading-none ${statusColor}`}>
-                              {statusText}
-                            </span>
-                          </div>
-                          {req.customText && (
-                            <p className="text-slate-500 italic text-[10px] leading-tight">
-                              "{req.customText}"
-                            </p>
-                          )}
-                          <div className="text-[8px] font-mono text-slate-400 text-right">
-                            {new Date(req.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                          </div>
                         </div>
-                      );
-                    })
-                  )}
-                </div>
-              </div>
-
-              {/* Offline VoIP instruction notice block */}
-              <div className="mt-4 pt-3 border-t border-slate-200 text-[10px] text-slate-400 font-mono space-y-1">
-                <div className="flex items-center gap-1.5 text-slate-500">
-                  <Layers className="w-3.5 h-3.5 text-slate-400" />
-                  <span className="font-bold uppercase tracking-wider">SIP REGISTER INFO</span>
-                </div>
-                <p className="leading-normal">
-                  The IP-PBX ringer signal runs on the local network. No Internet connection required.
-                </p>
+                        {req.customText && (
+                          <p className="text-slate-500 italic text-[10px] leading-tight">
+                            "{req.customText}"
+                          </p>
+                        )}
+                        <div className="text-[8px] font-mono text-slate-400 text-right">
+                          {new Date(req.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
               </div>
             </div>
-          )}
+
+            {/* Offline VoIP instruction notice block */}
+            <div className="mt-4 pt-3 border-t border-slate-200 text-[10px] text-slate-400 font-mono space-y-1">
+              <div className="flex items-center gap-1.5 text-slate-500">
+                <Layers className="w-3.5 h-3.5 text-slate-400" />
+                <span className="font-bold uppercase tracking-wider">SIP REGISTER INFO</span>
+              </div>
+              <p className="leading-normal">
+                The IP-PBX ringer signal runs on the local network. No Internet connection required.
+              </p>
+            </div>
+          </div>
         </div>
       </div>
-      {dialog}
+      {!isCallActive && dialog}
       {pinDialog}
       <AdminMenuDialog
         open={showAdminMenu}

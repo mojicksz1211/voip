@@ -1,10 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { CallMetadata } from './types';
 import { getLiveKitWsUrl, isUsableLiveKitWsUrl } from './api';
+import { isAndroidUserAgent } from './audioConfig';
 import { LiveKitCallManager, type LiveKitCallManagerOptions } from './LiveKitCallManager';
 
 export interface UseWebRtcVoiceOptions extends LiveKitCallManagerOptions {
   autoStart?: boolean;
+  /** Android room intercom: start on loudspeaker (not earpiece). Retro handset overrides. */
+  intercomSpeakerDefault?: boolean;
 }
 
 export function useWebRtcVoice(
@@ -82,7 +85,10 @@ export function useWebRtcVoice(
 
     setVoiceError(null);
     setIsMicMuted(false);
-    setIsSpeakerMuted(false);
+    const intercomSpeaker =
+      isAndroidUserAgent() && managerOptionsRef.current?.intercomSpeakerDefault === true;
+    // Android: earpiece by default (GSM-style), or loudspeaker for room intercom.
+    setIsSpeakerMuted(isAndroidUserAgent() && !intercomSpeaker);
     setIsOnHold(false);
 
     try {

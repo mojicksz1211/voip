@@ -38,12 +38,15 @@ export function subscribeRetroHandsetMode(listener: (enabled: boolean) => void):
   return () => listeners.delete(listener);
 }
 
-/** Same mic profile on desk and guest — guest path has NS enabled on Android. */
-export function resolveMicProfile(_app: 'desk' | 'guest'): MicProfile {
-  if (!isAndroidUserAgent() || !getRetroHandsetMode()) {
-    return 'default';
+/** Mic profile for pre-acquire (getUserMedia). Desk uses tablet/wired constraints; guest uses close-mic path. */
+export function resolveMicProfile(app: 'desk' | 'guest'): MicProfile {
+  if (getRetroHandsetMode()) {
+    return 'retro-handset';
   }
-  return 'retro-handset';
+  if (app === 'desk' && isAndroidUserAgent()) {
+    return 'desk';
+  }
+  return 'default';
 }
 
 /** Lower earpiece gain — retro handsets leak mic acoustically into the receiver. */

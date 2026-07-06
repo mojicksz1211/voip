@@ -20,6 +20,8 @@ import {
 } from "@hotel-voip/shared";
 import {
   applyCallAudioState,
+  reassertConnectedCallAudio,
+  resyncConnectedCallAudio,
   routeCallAudio,
   resetCallAudioRoute,
   startNativeRingtone,
@@ -28,6 +30,8 @@ import {
   scheduleAndroidHangupPlayback,
   wakeScreenForCall,
   subscribeHandsetHook,
+  enableSpeakerForCall,
+  hasProximitySensor,
 } from "../utils/callAudio";
 import {
   startCallForeground,
@@ -72,6 +76,8 @@ export function useGuestPbx() {
     useState<GuestConnectionStatus>("connecting");
   const [appAlert, setAppAlert] = useState<string | null>(null);
   const [retroHandset, setRetroHandset] = useState(() => getRetroHandsetMode());
+  /** False on phones (proximity → earpiece); true on tablets without proximity (loudspeaker). */
+  const [roomIntercomDevice, setRoomIntercomDevice] = useState(false);
 
   const showAppAlert = useCallback((message: string) => {
     setAppAlert(message);
@@ -86,10 +92,19 @@ export function useGuestPbx() {
   const currentCallRef = useRef(currentCall);
   const audioRoutePhaseRef = useRef<"idle" | "ringing" | "connected">("idle");
   const nativeRingCallIdRef = useRef<string | null>(null);
+  /** Android: true when user enabled loudspeaker (inverse of isSpeakerMuted). */
+  const speakerOnRef = useRef(false);
 
   useEffect(() => {
     currentCallRef.current = currentCall;
   }, [currentCall]);
+
+  useEffect(() => {
+    if (!isAndroidNative) return;
+    void hasProximitySensor().then((supported) => {
+      setRoomIntercomDevice(!supported);
+    });
+  }, []);
 
   const clearMicStream = useCallback(() => {
     releaseMicrophoneStream(micStreamRef.current);
@@ -111,7 +126,7 @@ export function useGuestPbx() {
       }
       const call = currentCallRef.current;
       if (call?.status === "connected") {
-        applyCallAudioState("connected", { withMic: true });
+        applyCallAudioState("connected", { withMic: true, forceSpeaker: speakerOnRef.current });
       } else {
         micStreamRef.current.getAudioTracks().forEach((track) => {
           track.enabled = false;
@@ -139,21 +154,33 @@ export function useGuestPbx() {
     currentCall,
     {
       autoStart: true,
+      intercomSpeakerDefault: !getRetroHandsetMode() && roomIntercomDevice,
       getLocalStream: () => micStreamRef.current,
       getAudioContext: () => playbackContextRef.current,
       remotePlaybackVolume: getRetroHandsetMode() ? RETRO_HANDSET_REMOTE_PLAYBACK_CAP : 1,
       liveKitMicCapture: () => resolveLiveKitMicCapture('guest'),
       onRemoteAudioStart: () => {
-        if (isAndroidNative) {
-          applyCallAudioState("connected", { withMic: Boolean(micStreamRef.current) });
+        if (isAndroidNative && !getRetroHandsetMode()) {
+          const withMic = Boolean(micStreamRef.current);
+          reassertConnectedCallAudio(withMic, speakerOnRef.current);
+          resyncConnectedCallAudio(withMic, speakerOnRef.current);
         }
       },
     },
   );
 
   const handleToggleSpeaker = useCallback(() => {
-    if (isAndroidNative && isSpeakerMuted) {
-      applyCallAudioState("connected", { withMic: Boolean(micStreamRef.current) });
+    if (isAndroidNative) {
+      if (isSpeakerMuted) {
+        speakerOnRef.current = true;
+        enableSpeakerForCall();
+      } else {
+        speakerOnRef.current = false;
+        applyCallAudioState("connected", {
+          withMic: Boolean(micStreamRef.current),
+          forceSpeaker: false,
+        });
+      }
     }
     toggleSpeaker();
   }, [isSpeakerMuted, toggleSpeaker]);
@@ -375,6 +402,7 @@ export function useGuestPbx() {
         audioRoutePhaseRef.current === "ringing" ||
         audioRoutePhaseRef.current === "connected";
       nativeRingCallIdRef.current = null;
+      speakerOnRef.current = false;
       if (endingActiveCall) {
         return scheduleAndroidHangupPlayback(playHangupSound, () => {
           stopNativeRingtone();
@@ -413,10 +441,26 @@ export function useGuestPbx() {
     stopNativeRingtone();
     nativeRingCallIdRef.current = null;
     if (audioRoutePhaseRef.current !== "connected") {
-      routeCallAudio("connected", withMic);
+      if (getRetroHandsetMode()) {
+        routeCallAudio("connected", withMic);
+      } else {
+        applyCallAudioState("connected", {
+          withMic,
+          forceSpeaker: speakerOnRef.current,
+        });
+      }
       audioRoutePhaseRef.current = "connected";
+      return reassertConnectedCallAudio(withMic, speakerOnRef.current);
     }
   }, [currentCall?.callId, currentCall?.status, roomNum]);
+
+  useEffect(() => {
+    if (!isAndroidNative || currentCall?.status !== "connected") return;
+    if (isVoiceConnected) {
+      const withMic = Boolean(micStreamRef.current);
+      return resyncConnectedCallAudio(withMic, speakerOnRef.current);
+    }
+  }, [currentCall?.callId, currentCall?.status, isVoiceConnected]);
 
   useEffect(() => {
     if (!isAndroidNative) return;
@@ -488,6 +532,7 @@ export function useGuestPbx() {
 
   const handleHangupCall = useCallback(
     async (callId: string) => {
+      setCurrentCall((prev) => (prev?.callId === callId ? null : prev));
       try {
         await apiFetch("/api/sip/hangup", {
           method: "POST",

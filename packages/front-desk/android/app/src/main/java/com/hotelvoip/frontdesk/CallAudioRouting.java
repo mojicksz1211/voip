@@ -10,9 +10,14 @@ final class CallAudioRouting {
     private CallAudioRouting() {}
 
     private static long lastFullRouteMs = 0;
+    private static long lastConnectedReassertMs = 0;
 
     static void resetRingRoutingThrottle() {
         lastFullRouteMs = 0;
+    }
+
+    static void resetConnectedReassertThrottle() {
+        lastConnectedReassertMs = 0;
     }
 
     /** Re-apply full routing at most every 2s to avoid UI jank during ring cycles. */
@@ -52,17 +57,138 @@ final class CallAudioRouting {
         boostRingVolumes(audioManager);
     }
 
-    static void prepareConnectedAudio(AudioManager audioManager, boolean preferHeadset) {
+    static void prepareConnectedAudio(AudioManager audioManager, boolean preferWiredHeadset) {
+        prepareConnectedAudio(audioManager, preferWiredHeadset, false);
+    }
+
+    /** @param forceSpeaker when true, route to loudspeaker (user toggled speaker on). */
+    static void prepareConnectedAudio(
+            AudioManager audioManager,
+            boolean preferWiredHeadset,
+            boolean forceSpeaker
+    ) {
         audioManager.setMicrophoneMute(false);
         audioManager.setBluetoothScoOn(false);
         audioManager.setMode(AudioManager.MODE_IN_COMMUNICATION);
 
-        if (preferHeadset && routeToWiredHeadsetIfAvailable(audioManager)) {
+        if (preferWiredHeadset && routeToWiredHeadsetIfAvailable(audioManager)) {
+            clearForcedSpeakerRouting(audioManager);
             audioManager.setSpeakerphoneOn(false);
-        } else {
-            clearCommunicationDevice(audioManager);
+            return;
+        }
+
+        clearCommunicationDevice(audioManager);
+
+        if (forceSpeaker) {
             audioManager.setSpeakerphoneOn(true);
             forceAllStreamsToSpeaker(audioManager);
+            routeOutputToBuiltInSpeaker(audioManager);
+            return;
+        }
+
+        // Ring phase forces speaker via AudioSystem.setForceUse — must clear before earpiece.
+        clearForcedSpeakerRouting(audioManager);
+
+        // Phones: earpiece. Tablets (no earpiece device): fall back to loudspeaker.
+        routeConnectedDefaultOutput(audioManager);
+    }
+
+    static boolean hasBuiltInEarpiece(AudioManager audioManager) {
+        return findBuiltInEarpiece(audioManager) != null;
+    }
+
+    static void routeSpeakerOutput(AudioManager audioManager) {
+        audioManager.setSpeakerphoneOn(true);
+        forceAllStreamsToSpeaker(audioManager);
+        routeOutputToBuiltInSpeaker(audioManager);
+    }
+
+    /** Earpiece when available; otherwise loudspeaker (desk tablets have no earpiece). */
+    static void routeConnectedDefaultOutput(AudioManager audioManager) {
+        if (!routeToBuiltInEarpieceIfAvailable(audioManager)) {
+            routeSpeakerOutput(audioManager);
+        }
+    }
+
+    /**
+     * Front-desk tablet: without a wired jack, always use the built-in loudspeaker.
+     * Many tablets expose a fake earpiece route that is effectively silent.
+     */
+    static void prepareDeskConnectedAudio(
+            AudioManager audioManager,
+            boolean preferWiredHeadset,
+            boolean forceSpeaker
+    ) {
+        if (!isWiredHeadsetConnected(audioManager)) {
+            prepareConnectedAudio(audioManager, preferWiredHeadset, true);
+            return;
+        }
+        prepareConnectedAudio(audioManager, preferWiredHeadset, forceSpeaker);
+    }
+
+    /**
+     * Light reassert after WebRTC overrides routing — throttled, no clearCommunicationDevice churn.
+     */
+    static void reassertConnectedAudio(AudioManager audioManager, boolean forceSpeaker) {
+        long now = SystemClock.elapsedRealtime();
+        if (lastConnectedReassertMs != 0 && now - lastConnectedReassertMs < 2000L) {
+            return;
+        }
+        lastConnectedReassertMs = now;
+
+        if (forceSpeaker) {
+            if (!audioManager.isSpeakerphoneOn()) {
+                audioManager.setSpeakerphoneOn(true);
+            }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                AudioDeviceInfo current = audioManager.getCommunicationDevice();
+                if (current == null || current.getType() != AudioDeviceInfo.TYPE_BUILTIN_SPEAKER) {
+                    routeOutputToBuiltInSpeaker(audioManager);
+                }
+            }
+            return;
+        }
+
+        audioManager.setMicrophoneMute(false);
+
+        if (isWiredHeadsetConnected(audioManager)) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                AudioDeviceInfo current = audioManager.getCommunicationDevice();
+                AudioDeviceInfo wired = findWiredCommunicationDevice(audioManager);
+                if (wired != null
+                        && (current == null || current.getId() != wired.getId())) {
+                    audioManager.setCommunicationDevice(wired);
+                    disableHandsetSidetone(audioManager);
+                }
+            } else if (audioManager.isSpeakerphoneOn()) {
+                audioManager.setSpeakerphoneOn(false);
+                disableHandsetSidetone(audioManager);
+            }
+            return;
+        }
+
+        if (!hasBuiltInEarpiece(audioManager)) {
+            if (!audioManager.isSpeakerphoneOn()) {
+                audioManager.setSpeakerphoneOn(true);
+            }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                AudioDeviceInfo current = audioManager.getCommunicationDevice();
+                if (current == null || current.getType() != AudioDeviceInfo.TYPE_BUILTIN_SPEAKER) {
+                    routeOutputToBuiltInSpeaker(audioManager);
+                }
+            }
+            return;
+        }
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            AudioDeviceInfo current = audioManager.getCommunicationDevice();
+            if (current != null && current.getType() == AudioDeviceInfo.TYPE_BUILTIN_SPEAKER) {
+                routeToBuiltInEarpieceIfAvailable(audioManager);
+            }
+            return;
+        }
+        if (audioManager.isSpeakerphoneOn()) {
+            audioManager.setSpeakerphoneOn(false);
         }
     }
 
@@ -108,6 +234,38 @@ final class CallAudioRouting {
             }
         }
         return null;
+    }
+
+    static AudioDeviceInfo findBuiltInEarpiece(AudioManager audioManager) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) {
+            return null;
+        }
+        for (AudioDeviceInfo device : audioManager.getDevices(AudioManager.GET_DEVICES_OUTPUTS)) {
+            if (device.getType() == AudioDeviceInfo.TYPE_BUILTIN_EARPIECE) {
+                return device;
+            }
+        }
+        return null;
+    }
+
+    /** Routes voice call audio to the built-in earpiece when available. */
+    static boolean routeToBuiltInEarpieceIfAvailable(AudioManager audioManager) {
+        clearForcedSpeakerRouting(audioManager);
+        audioManager.setSpeakerphoneOn(false);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            try {
+                AudioDeviceInfo earpiece = findBuiltInEarpiece(audioManager);
+                if (earpiece != null) {
+                    return audioManager.setCommunicationDevice(earpiece);
+                }
+            } catch (SecurityException ignored) {
+                // Some builds reject communication device changes without policy access.
+            }
+            // No earpiece device (e.g. unfolded foldable) — speakerphone off, system default route.
+            return false;
+        }
+        // Pre-API 31: MODE_IN_COMMUNICATION + speaker off typically uses earpiece on phones.
+        return true;
     }
 
     static void boostRingVolumes(AudioManager audioManager) {
@@ -220,6 +378,35 @@ final class CallAudioRouting {
             setForceUse.invoke(null, 2, 1);
         } catch (Exception ignored) {
             // Not available on all builds
+        }
+    }
+
+    /** Undo ring-phase AudioSystem / OEM force-speaker so connected calls can use earpiece. */
+    static void clearForcedSpeakerRouting(AudioManager audioManager) {
+        try {
+            Class<?> audioSystem = Class.forName("android.media.AudioSystem");
+            java.lang.reflect.Method setForceUse = audioSystem.getMethod(
+                    "setForceUse",
+                    int.class,
+                    int.class
+            );
+            setForceUse.invoke(null, 0, 0);
+            setForceUse.invoke(null, 1, 0);
+            setForceUse.invoke(null, 2, 0);
+        } catch (Exception ignored) {
+            // Not available on all builds
+        }
+        final String[] params = {
+                "force_speaker=false",
+                "routing=default",
+                "audio_output_device=auto",
+        };
+        for (String param : params) {
+            try {
+                audioManager.setParameters(param);
+            } catch (Exception ignored) {
+                // OEM-specific; best effort only.
+            }
         }
     }
 

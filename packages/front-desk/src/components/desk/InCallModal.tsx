@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { PhoneOff, Mic, MicOff, Volume2, VolumeX, Pause, Play } from 'lucide-react';
 import type { CallMetadata, SIPExtension } from '@hotel-voip/shared';
 import { formatCallDuration } from '../../utils/deskHelpers';
+import { isAndroidNative } from '../../utils/callAudio';
 import VoiceSinewave from './VoiceSinewave';
 
 interface InCallModalProps {
@@ -109,7 +110,7 @@ export default function InCallModal({
       <div className="w-full max-w-xl">
         <VoiceSinewave
           active={isVoiceConnected}
-          paused={isOnHold || isSpeakerMuted}
+          paused={isOnHold || (!isAndroidNative && isSpeakerMuted)}
           className="h-28 sm:h-32"
         />
       </div>

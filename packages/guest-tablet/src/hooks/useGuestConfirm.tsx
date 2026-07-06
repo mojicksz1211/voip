@@ -24,6 +24,13 @@ export function useGuestConfirm() {
     [],
   );
 
+  const dismissPending = useCallback(() => {
+    setPending((current) => {
+      current?.resolve(false);
+      return null;
+    });
+  }, []);
+
   const close = useCallback((result: boolean) => {
     setPending((current) => {
       current?.resolve(result);
@@ -44,5 +51,5 @@ export function useGuestConfirm() {
     />
   ) : null;
 
-  return { confirm, dialog };
+  return { confirm, dismissPending, dialog };
 }

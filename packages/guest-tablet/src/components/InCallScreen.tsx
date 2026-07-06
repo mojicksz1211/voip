@@ -75,7 +75,7 @@ export default function InCallScreen({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[190] flex flex-col items-center justify-between select-none animate-fadeIn bg-gradient-to-b from-[#0a1f44] via-[#0b1e3f] to-[#08152e] text-white px-6 safe-call-inset"
+      className="fixed inset-0 z-[210] flex flex-col items-center justify-between select-none animate-fadeIn bg-gradient-to-b from-[#0a1f44] via-[#0b1e3f] to-[#08152e] text-white px-6 safe-call-inset"
       role="dialog"
       aria-modal="true"
       aria-labelledby="guest-incall-title"
@@ -97,7 +97,7 @@ export default function InCallScreen({
       </div>
 
       <div className="w-full max-w-xl">
-        <VoiceSinewave active={isVoiceConnected} paused={isSpeakerMuted} className="h-28 sm:h-32" />
+        <VoiceSinewave active={isVoiceConnected} className="h-28 sm:h-32" />
       </div>
 
       <div className="w-full max-w-sm flex flex-col items-center gap-8 mb-2">

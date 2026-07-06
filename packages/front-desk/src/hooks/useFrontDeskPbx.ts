@@ -10,6 +10,7 @@ import {
   useWebRtcVoice,
   acquireMicrophone,
   releaseMicrophoneStream,
+  enableDeskMicTracks,
   createVoicePlaybackContext,
   resolveMicProfile,
   resolveLiveKitMicCapture,
@@ -20,6 +21,8 @@ import {
 } from "@hotel-voip/shared";
 import {
   applyCallAudioState,
+  reassertConnectedCallAudio,
+  resyncConnectedCallAudio,
   routeCallAudio,
   resetCallAudioRoute,
   wakeScreenForCall,
@@ -33,6 +36,7 @@ import {
   presentIncomingCall,
   cancelIncomingCall,
   subscribeHandsetHook,
+  enableSpeakerForCall,
 } from "../utils/callAudio";
 import {
   getDeskAudioSettings,
@@ -55,6 +59,8 @@ export function useFrontDeskPbx() {
   const currentCallRef = useRef(currentCall);
   const audioRoutePhaseRef = useRef<"idle" | "ringing" | "connected">("idle");
   const nativeRingCallIdRef = useRef<string | null>(null);
+  /** Android: true when user enabled loudspeaker (inverse of isSpeakerMuted). */
+  const speakerOnRef = useRef(false);
   const setRemotePlaybackVolumeRef = useRef<(volume: number) => void>(() => {});
 
   useEffect(() => {
@@ -82,9 +88,9 @@ export function useFrontDeskPbx() {
     try {
       clearMicStream();
       if (currentCallRef.current?.status === "connected") {
-        applyCallAudioState("connected", { withMic: true });
+        applyCallAudioState("connected", { withMic: true, forceSpeaker: speakerOnRef.current });
       }
-      micStreamRef.current = await acquireMicrophone({ profile: resolveMicProfile('guest') });
+      micStreamRef.current = await acquireMicrophone({ profile: resolveMicProfile('desk') });
       if (!isAndroidNative) {
         playbackContextRef.current = createVoicePlaybackContext();
         await playbackContextRef.current.resume();
@@ -121,14 +127,29 @@ export function useFrontDeskPbx() {
     getAudioContext: () => playbackContextRef.current,
     remotePlaybackVolume: getRetroHandsetMode() ? RETRO_HANDSET_REMOTE_PLAYBACK_CAP : 1,
     liveKitMicCapture: () => resolveLiveKitMicCapture('desk'),
+    preferWiredCaptureDevice: getRetroHandsetMode(),
     beforeAcquireMic: async () => {
       if (isAndroidNative) {
-        applyCallAudioState("connected", { withMic: true });
+        enableDeskMicTracks(micStreamRef.current);
+        const intercomSpeaker = !getRetroHandsetMode();
+        applyCallAudioState("connected", {
+          withMic: true,
+          forceSpeaker: intercomSpeaker || speakerOnRef.current,
+          intercomSpeaker,
+        });
       }
     },
     onRemoteAudioStart: () => {
       if (isAndroidNative) {
-        applyCallAudioState("connected", { withMic: Boolean(micStreamRef.current) });
+        const intercomSpeaker = !getRetroHandsetMode();
+        if (intercomSpeaker) {
+          speakerOnRef.current = true;
+          enableSpeakerForCall();
+        }
+        const withMic = Boolean(micStreamRef.current);
+        const forceSpeaker = speakerOnRef.current;
+        reassertConnectedCallAudio(withMic, forceSpeaker);
+        resyncConnectedCallAudio(withMic, forceSpeaker);
       }
       applyDeskAudio();
     },
@@ -147,6 +168,7 @@ export function useFrontDeskPbx() {
         audioRoutePhaseRef.current === "ringing" ||
         audioRoutePhaseRef.current === "connected";
       nativeRingCallIdRef.current = null;
+      speakerOnRef.current = false;
       if (endingActiveCall) {
         return scheduleAndroidHangupPlayback(playHangupSound, () => {
           stopNativeRingtone();
@@ -184,14 +206,39 @@ export function useFrontDeskPbx() {
     stopNativeRingtone();
     nativeRingCallIdRef.current = null;
     if (audioRoutePhaseRef.current !== "connected") {
-      routeCallAudio("connected", withMic);
+      const intercomSpeaker = isAndroidNative && !getRetroHandsetMode();
+      speakerOnRef.current = intercomSpeaker;
+      if (intercomSpeaker) {
+        applyCallAudioState("connected", { withMic, forceSpeaker: true, intercomSpeaker: true });
+      } else {
+        routeCallAudio("connected", withMic);
+      }
       audioRoutePhaseRef.current = "connected";
+      return reassertConnectedCallAudio(withMic, speakerOnRef.current);
     }
   }, [currentCall?.callId, currentCall?.status]);
 
+  useEffect(() => {
+    if (!isAndroidNative || currentCall?.status !== "connected") return;
+    enableDeskMicTracks(micStreamRef.current);
+    if (isVoiceConnected) {
+      const withMic = Boolean(micStreamRef.current);
+      return resyncConnectedCallAudio(withMic, speakerOnRef.current);
+    }
+  }, [currentCall?.callId, currentCall?.status, isVoiceConnected]);
+
   const handleToggleSpeaker = useCallback(() => {
-    if (isAndroidNative && isSpeakerMuted) {
-      applyCallAudioState("connected", { withMic: Boolean(micStreamRef.current) });
+    if (isAndroidNative) {
+      if (isSpeakerMuted) {
+        speakerOnRef.current = true;
+        enableSpeakerForCall();
+      } else {
+        speakerOnRef.current = false;
+        applyCallAudioState("connected", {
+          withMic: Boolean(micStreamRef.current),
+          forceSpeaker: false,
+        });
+      }
     }
     toggleSpeaker();
   }, [isSpeakerMuted, toggleSpeaker]);
