@@ -6,6 +6,7 @@ interface DeskSidebarProps {
   onNavChange: (nav: DeskNav) => void;
   pendingRequests: number;
   layout?: 'side' | 'bottom';
+  className?: string;
 }
 
 const NAV_ITEMS: { id: DeskNav; icon: typeof Grid3X3; label: string }[] = [
@@ -22,6 +23,7 @@ export default function DeskSidebar({
   onNavChange,
   pendingRequests,
   layout = 'side',
+  className = '',
 }: DeskSidebarProps) {
   const isBottom = layout === 'bottom';
 
@@ -29,9 +31,9 @@ export default function DeskSidebar({
     <nav
       className={`shrink-0 bg-white border-slate-200 flex ${
         isBottom
-          ? 'flex-row justify-around items-center h-[72px] border-t px-2 safe-area-pb'
-          : 'flex-col items-stretch py-4 gap-1 w-[104px] border-r px-2'
-      }`}
+          ? 'flex-row justify-around items-center h-[clamp(56px,10vh,72px)] border-t px-2 safe-area-pb'
+          : 'flex-col items-stretch py-3 landscape:py-2 gap-1 w-[clamp(72px,12vw,104px)] border-r px-1.5'
+      } ${className}`}
     >
       {NAV_ITEMS.map(({ id, icon: Icon, label }) => {
         const active = activeNav === id;
@@ -44,17 +46,17 @@ export default function DeskSidebar({
             onClick={() => onNavChange(id)}
             title={label}
             className={`relative flex flex-col items-center justify-center transition-colors rounded-xl ${
-              isBottom ? 'flex-1 py-2.5 gap-1' : 'w-full py-3 gap-1.5'
+              isBottom ? 'flex-1 py-2 landscape:py-1.5 gap-1' : 'w-full py-2.5 landscape:py-2 gap-1'
             } ${
               active
                 ? 'text-desk-primary bg-blue-50'
                 : 'text-slate-400 hover:text-slate-600 hover:bg-slate-50'
             }`}
           >
-            <Icon className="w-6 h-6 shrink-0" strokeWidth={2} />
+            <Icon className="w-5 h-5 landscape:w-6 landscape:h-6 shrink-0" strokeWidth={2} />
             <span
               className={`font-medium leading-none text-center ${
-                isBottom ? 'text-[10px]' : 'text-xs'
+                isBottom ? 'text-[10px] landscape:text-[9px]' : 'text-[10px] landscape:text-xs'
               }`}
             >
               {label}

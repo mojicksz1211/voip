@@ -93,42 +93,44 @@ export default function ActiveCallOverlay({
   };
 
   return (
-    <div className="fixed inset-0 z-50 desk-gradient-call flex flex-col text-white animate-fadeIn">
-      <div className="flex-1 flex flex-col items-center justify-center px-6 pt-12 pb-6">
+    <div className="fixed inset-0 z-50 desk-gradient-call flex flex-col landscape:flex-row landscape:items-center landscape:justify-around short:overflow-y-auto text-white animate-fadeIn safe-call-inset">
+      <div className="flex-1 landscape:flex-none flex flex-col items-center landscape:items-start justify-center landscape:justify-center px-6 landscape:px-4 pt-8 landscape:pt-0 pb-4 landscape:pb-0 shrink-0">
         {isOnHold && (
-          <span className="mb-4 px-3 py-1 bg-white/20 rounded-full text-xs font-bold uppercase tracking-wider">
+          <span className="mb-3 landscape:mb-2 px-3 py-1 bg-white/20 rounded-full text-xs font-bold uppercase tracking-wider">
             On Hold
           </span>
         )}
 
-        <div className="w-24 h-24 rounded-full bg-white/20 flex items-center justify-center text-3xl font-bold mb-4 animate-call-pulse">
+        <div className="call-avatar-size rounded-full bg-white/20 flex items-center justify-center text-2xl landscape:text-3xl font-bold mb-3 landscape:mb-2 animate-call-pulse">
           {getInitials(peerName)}
         </div>
 
-        <h2 className="text-2xl font-bold mb-1">{peerName}</h2>
-        <p className="text-white/70 text-sm mb-1">Ext {peerExt}</p>
+        <h2 className="call-title-size font-bold mb-1 landscape:text-left short:text-2xl">{peerName}</h2>
+        <p className="text-white/70 text-sm mb-1 landscape:text-left">Ext {peerExt}</p>
 
         {isIncoming ? (
-          <p className="text-white/80 text-sm animate-pulse mt-2">Incoming call…</p>
+          <p className="text-white/80 text-sm animate-pulse mt-2 landscape:mt-1">Incoming call…</p>
         ) : isConnected ? (
-          <p className="text-white/90 text-lg font-mono mt-2 tabular-nums">
+          <p className="text-white/90 text-lg landscape:text-base font-mono mt-2 landscape:mt-1 tabular-nums">
             {formatCallDuration(elapsed)}
           </p>
         ) : (
-          <p className="text-white/70 text-sm mt-2">Connecting…</p>
+          <p className="text-white/70 text-sm mt-2 landscape:mt-1">Connecting…</p>
         )}
 
         {isConnected && !isVoiceConnected && !voiceError && (
-          <p className="text-white/60 text-xs mt-2">Establishing audio…</p>
+          <p className="text-white/60 text-xs mt-2 landscape:mt-1">Establishing audio…</p>
         )}
         {voiceError && (
-          <p className="text-rose-200 text-xs mt-2 text-center max-w-xs">{voiceError}</p>
+          <p className="text-rose-200 text-xs mt-2 landscape:mt-1 text-center landscape:text-left max-w-xs">
+            {voiceError}
+          </p>
         )}
       </div>
 
-      <div className="px-8 pb-10 pt-4">
+      <div className="px-6 landscape:px-4 pb-8 landscape:pb-0 pt-2 landscape:pt-0 shrink-0">
         {isIncoming ? (
-          <div className="flex items-center justify-center gap-12">
+          <div className="flex items-center justify-center gap-10 landscape:gap-6">
             <CallControlButton
               icon={PhoneOff}
               label="Decline"
@@ -143,7 +145,7 @@ export default function ActiveCallOverlay({
           </div>
         ) : (
           <>
-            <div className="grid grid-cols-3 gap-6 max-w-xs mx-auto mb-8">
+            <div className="grid grid-cols-3 gap-4 landscape:gap-3 max-w-xs landscape:max-w-none mx-auto mb-6 landscape:mb-4">
               <CallControlButton
                 icon={isMicMuted ? MicOff : Mic}
                 label={isMicMuted ? 'Unmute' : 'Mute'}

@@ -18,7 +18,7 @@ export default function GuestModal({
 
   return createPortal(
     <div
-      className={`fixed inset-0 ${zIndexClass} flex items-center justify-center p-4`}
+      className={`fixed inset-0 ${zIndexClass} flex items-center justify-center p-4 landscape:p-3 safe-call-inset`}
       style={{ touchAction: 'manipulation' }}
     >
       <button
@@ -28,7 +28,7 @@ export default function GuestModal({
         aria-label="Close dialog"
       />
       <div
-        className="relative z-10 w-full max-w-sm pointer-events-auto"
+        className="relative z-10 w-full max-w-sm max-h-[min(60vh,calc(100dvh-2rem))] landscape:max-h-[85dvh] overflow-y-auto pointer-events-auto"
         onClick={(e) => e.stopPropagation()}
         onTouchStart={(e) => e.stopPropagation()}
       >

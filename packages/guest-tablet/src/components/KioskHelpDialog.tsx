@@ -44,19 +44,19 @@ export default function KioskHelpDialog({
         </h3>
         {deviceOwner ? (
           <p className="text-sm text-slate-600 mt-2 leading-relaxed">
-            Full device lock is enabled. Home and Recents are disabled. Only staff can unpin
-            using Admin PIN.
+            Full device lock is enabled. Home and Recents are disabled. Use Settings to unpin
+            when needed.
           </p>
         ) : lockTaskActive ? (
           <p className="text-sm text-slate-600 mt-2 leading-relaxed">
             Screen pin is active. If a guest uses Back+Overview to unpin, this app will return
-            and re-pin automatically. Only staff Admin PIN can fully unpin.
+            and re-pin automatically. Use Settings to fully unpin.
           </p>
         ) : (
           <div className="text-sm text-slate-600 mt-2 leading-relaxed space-y-2">
             <p>
               Kiosk guardian is running. If guests leave the app (Back+Overview), it will{' '}
-              <strong>return automatically</strong> and re-pin. Only staff Admin PIN can unpin.
+              <strong>return automatically</strong> and re-pin. Use Settings to unpin.
             </p>
             <p className="text-[12px] text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-lg px-3 py-2">
               <strong>Best lock (IT one-time):</strong> factory-reset tablet, no Google account,

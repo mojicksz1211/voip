@@ -112,7 +112,7 @@ export default function DeskRequestsPanel({ requests, onUpdateStatus }: DeskRequ
   };
 
   return (
-    <div className="flex flex-col h-full max-w-4xl bg-white rounded-2xl desk-shadow-card overflow-hidden border border-slate-100">
+    <div className="flex flex-col h-full max-w-4xl w-full bg-white rounded-2xl desk-shadow-card overflow-hidden border border-slate-100">
       <div className="px-4 sm:px-5 py-4 border-b border-slate-100 shrink-0">
         <div className="flex items-center justify-between gap-3 mb-3">
           <h2 className="text-xl sm:text-2xl font-bold text-slate-800">Guest Requests</h2>

@@ -62,7 +62,7 @@ function GuestAppContent() {
     <div className="h-[100dvh] w-screen overflow-hidden bg-slate-900">{tablet}</div>
   ) : (
     <div className="min-h-screen bg-slate-100 p-4 lg:p-6 flex items-center justify-center">
-      <div className="w-full max-w-2xl h-[calc(100vh-2rem)] max-h-[800px]">{tablet}</div>
+      <div className="w-full max-w-2xl h-[calc(100vh-2rem)] max-h-[90dvh]">{tablet}</div>
     </div>
   );
 

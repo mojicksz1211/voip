@@ -215,7 +215,7 @@ export default function FrontDesk({
         />
 
         {activeNav === 'keypad' && (
-          <div className="w-[380px] shrink-0 border-r border-slate-200 flex flex-col min-h-0 bg-white">
+          <div className="w-full min-w-[280px] max-w-[min(380px,35vw)] shrink-0 border-r border-slate-200 flex flex-col min-h-0 bg-white">
             <div className="flex-1 min-h-0">
               <DeskDialer
                 key={dialSeed}
@@ -252,11 +252,11 @@ export default function FrontDesk({
           />
           <div className="flex-1 min-h-0 p-5 overflow-y-auto flex flex-col gap-5">
             {activeNav === 'keypad' ? (
-              <div className="flex flex-1 min-h-0 gap-4">
-                <div className="w-[340px] shrink-0 bg-white rounded-2xl desk-shadow-card overflow-hidden">
+              <div className="flex flex-1 min-h-0 gap-4 flex-row short-landscape:flex-col">
+                <div className="w-full min-w-[260px] max-w-[min(340px,40vw)] shrink-0 bg-white rounded-2xl desk-shadow-card overflow-hidden short-landscape:max-w-none">
                   <DeskDialer onCall={handleDial} disabled={effectiveDnd} />
                 </div>
-                <div className="flex-1 min-h-0">
+                <div className="flex-1 min-h-0 min-w-0">
                   <DeskRecentsPanel calls={calls} extensions={extensions} onDial={handleDial} />
                 </div>
               </div>
@@ -267,9 +267,16 @@ export default function FrontDesk({
         </div>
       </div>
 
-      {/* Mobile layout: single panel + bottom nav */}
-      <div className="flex md:hidden flex-1 min-h-0 flex-col">
-        <div className="flex-1 min-h-0 p-4 overflow-y-auto flex flex-col">
+      {/* Mobile layout: single panel + bottom nav (side nav in landscape) */}
+      <div className="flex md:hidden flex-1 min-h-0 flex-col landscape:flex-row">
+        <DeskSidebar
+          activeNav={activeNav}
+          onNavChange={setActiveNav}
+          pendingRequests={pendingRequests}
+          layout="side"
+          className="hidden landscape:flex"
+        />
+        <div className="flex-1 min-h-0 p-4 landscape:p-3 overflow-y-auto flex flex-col safe-area-pb">
           {activeNav === 'keypad' && (
             <DeskDialer onCall={handleDial} disabled={effectiveDnd} />
           )}
@@ -280,6 +287,7 @@ export default function FrontDesk({
           onNavChange={setActiveNav}
           pendingRequests={pendingRequests}
           layout="bottom"
+          className="landscape:hidden"
         />
       </div>
 

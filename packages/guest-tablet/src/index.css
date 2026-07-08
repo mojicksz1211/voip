@@ -1,5 +1,10 @@
 @import "tailwindcss";
 
+@custom-variant landscape (@media (orientation: landscape));
+@custom-variant portrait (@media (orientation: portrait));
+@custom-variant short (@media (max-height: 500px));
+@custom-variant short-landscape (@media (orientation: landscape) and (max-height: 500px));
+
 html,
 body,
 #root {
@@ -85,5 +90,53 @@ body,
   .safe-call-inset {
     padding-top: max(4rem, env(safe-area-inset-top, 0px));
     padding-bottom: max(2.5rem, env(safe-area-inset-bottom, 0px));
+  }
+
+  @media (orientation: landscape) {
+    .safe-call-inset {
+      padding-top: max(1.5rem, env(safe-area-inset-top, 0px));
+      padding-bottom: max(1.25rem, env(safe-area-inset-bottom, 0px));
+    }
+  }
+
+  @media (max-height: 500px) {
+    .safe-call-inset {
+      padding-top: max(1rem, env(safe-area-inset-top, 0px));
+      padding-bottom: max(0.75rem, env(safe-area-inset-bottom, 0px));
+    }
+  }
+
+  .call-avatar-size {
+    width: clamp(5rem, 20vmin, 10rem);
+    height: clamp(5rem, 20vmin, 10rem);
+  }
+
+  .call-ripple-size {
+    width: clamp(8rem, 30vmin, 16rem);
+    height: clamp(8rem, 30vmin, 16rem);
+  }
+
+  .call-ripple-size-lg {
+    width: clamp(9rem, 35vmin, 18rem);
+    height: clamp(9rem, 35vmin, 18rem);
+  }
+
+  .call-title-size {
+    font-size: clamp(1.5rem, 5vw, 3rem);
+    line-height: 1.2;
+  }
+
+  .call-btn-size {
+    width: clamp(3rem, 12vmin, 4.5rem);
+    height: clamp(3rem, 12vmin, 4.5rem);
+    min-width: 3rem;
+    min-height: 3rem;
+  }
+
+  .call-control-btn-size {
+    width: clamp(3rem, 10vmin, 4rem);
+    height: clamp(3rem, 10vmin, 4rem);
+    min-width: 3rem;
+    min-height: 3rem;
   }
 }

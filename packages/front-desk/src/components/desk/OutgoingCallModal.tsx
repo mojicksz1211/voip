@@ -29,52 +29,55 @@ export default function OutgoingCallModal({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[200] flex flex-col items-center justify-between select-none animate-fadeIn bg-gradient-to-b from-[#0a1f44] via-[#0b1e3f] to-[#08152e] text-white px-6 safe-call-inset"
+      className="fixed inset-0 z-[200] flex flex-col landscape:flex-row landscape:items-center landscape:justify-around landscape:gap-4 landscape:px-8 short:overflow-y-auto items-center justify-between select-none animate-fadeIn bg-gradient-to-b from-[#0a1f44] via-[#0b1e3f] to-[#08152e] text-white px-6 safe-call-inset"
       role="dialog"
       aria-modal="true"
       aria-labelledby="outgoing-call-title"
     >
-      <div className="mt-6 flex flex-col items-center text-center">
-        <p className="text-xs font-semibold tracking-[0.28em] text-blue-200/60 uppercase mb-8">
+      <div className="mt-6 landscape:mt-0 flex flex-col items-center landscape:items-start text-center landscape:text-left shrink-0">
+        <p className="text-xs font-semibold tracking-[0.28em] text-blue-200/60 uppercase mb-6 landscape:mb-2 short:mb-1">
           Calling
         </p>
         <h1
           id="outgoing-call-title"
-          className="text-4xl sm:text-5xl font-bold leading-tight px-2"
+          className="call-title-size font-bold px-2 landscape:px-0 short:text-2xl"
         >
           {peerName}
         </h1>
-        <p className="text-lg text-blue-200/70 mt-3">Ext {peerExt}</p>
-        <p className="text-sm text-blue-300/70 font-medium mt-4 animate-pulse">Ringing…</p>
+        <p className="text-base landscape:text-lg text-blue-200/70 mt-2 landscape:mt-1">Ext {peerExt}</p>
+        <p className="text-sm text-blue-300/70 font-medium mt-3 landscape:mt-2 animate-pulse">Ringing…</p>
       </div>
 
-      <div className="relative flex items-center justify-center pointer-events-none">
-        <span className="absolute w-56 h-56 rounded-full bg-white/5 animate-ripple" aria-hidden />
+      <div className="relative flex items-center justify-center pointer-events-none shrink-0">
         <span
-          className="absolute w-64 h-64 rounded-full bg-white/5 animate-ripple"
+          className="absolute call-ripple-size rounded-full bg-white/5 animate-ripple short-landscape:hidden"
+          aria-hidden
+        />
+        <span
+          className="absolute call-ripple-size-lg rounded-full bg-white/5 animate-ripple short-landscape:hidden"
           style={{ animationDelay: '0.5s' }}
           aria-hidden
         />
-        <div className="relative w-40 h-40 rounded-full bg-gradient-to-br from-blue-500/40 to-indigo-500/20 border border-white/10 shadow-2xl flex items-center justify-center overflow-hidden">
+        <div className="relative call-avatar-size rounded-full bg-gradient-to-br from-blue-500/40 to-indigo-500/20 border border-white/10 shadow-2xl flex items-center justify-center overflow-hidden">
           {initials ? (
-            <span className="text-5xl font-bold text-white">{initials}</span>
+            <span className="text-3xl landscape:text-4xl font-bold text-white">{initials}</span>
           ) : (
-            <User className="w-16 h-16 text-white/80" />
+            <User className="w-12 h-12 landscape:w-16 landscape:h-16 text-white/80" />
           )}
         </div>
       </div>
 
-      <div className="flex flex-col items-center gap-3 mb-2">
+      <div className="flex flex-col items-center gap-2 landscape:gap-1.5 mb-2 landscape:mb-0 shrink-0">
         <button
           type="button"
           onClick={onCancel}
           aria-label="Cancel call"
           style={{ touchAction: 'manipulation' }}
-          className="w-[72px] h-[72px] rounded-full bg-rose-600 hover:bg-rose-700 flex items-center justify-center shadow-xl transition-all active:scale-95"
+          className="call-btn-size rounded-full bg-rose-600 hover:bg-rose-700 flex items-center justify-center shadow-xl transition-all active:scale-95"
         >
-          <PhoneOff className="w-7 h-7" />
+          <PhoneOff className="w-6 h-6 landscape:w-7 landscape:h-7" />
         </button>
-        <span className="text-sm font-medium text-blue-100">End</span>
+        <span className="text-sm font-medium text-blue-100 short-landscape:hidden">End</span>
       </div>
     </div>,
     document.body,

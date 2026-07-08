@@ -125,7 +125,7 @@ function RoomCard({
         </div>
       </div>
 
-      <div className="py-2 max-h-[420px] sm:max-h-[480px] overflow-y-auto">
+      <div className="flex-1 min-h-0 max-h-[min(480px,55dvh)] overflow-y-auto py-2">
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-x-2 gap-y-0.5">
           {items.map((ext) => (
             <RoomRow key={ext.extension} ext={ext} canDial={canDial} onDial={onDial} />
@@ -165,7 +165,7 @@ export default function DeskRoomsPanel({
   }
 
   return (
-    <div className="flex flex-col h-full max-w-4xl gap-5 overflow-y-auto min-h-0 pr-1">
+    <div className="flex flex-col h-full max-w-4xl w-full gap-5 overflow-y-auto min-h-0 pr-1">
       {guestRooms.length > 0 && (
         <RoomCard
           title="Guest Rooms"

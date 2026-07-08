@@ -24,22 +24,24 @@ export default function CallControlButton({
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className={`flex flex-col items-center gap-1.5 transition-all active:scale-95 disabled:opacity-40 disabled:pointer-events-none ${
+      className={`flex flex-col items-center gap-1 landscape:gap-0.5 transition-all active:scale-95 disabled:opacity-40 disabled:pointer-events-none ${
         isHangup ? '' : 'group'
       }`}
     >
       <span
         className={`flex items-center justify-center rounded-full transition-colors ${
           isHangup
-            ? 'w-16 h-16 bg-desk-hangup text-white shadow-lg hover:bg-red-600'
+            ? 'call-btn-size bg-desk-hangup text-white shadow-lg hover:bg-red-600'
             : active
-              ? 'w-14 h-14 bg-white/25 text-white ring-2 ring-white/50'
-              : 'w-14 h-14 bg-white/15 text-white hover:bg-white/25 backdrop-blur-sm'
+              ? 'call-control-btn-size bg-white/25 text-white ring-2 ring-white/50'
+              : 'call-control-btn-size bg-white/15 text-white hover:bg-white/25 backdrop-blur-sm'
         }`}
       >
-        <Icon className={isHangup ? 'w-7 h-7' : 'w-6 h-6'} />
+        <Icon className={isHangup ? 'w-6 h-6 landscape:w-7 landscape:h-7' : 'w-5 h-5 landscape:w-6 landscape:h-6'} />
       </span>
-      <span className={`text-[11px] font-medium ${isHangup ? 'text-white/90' : 'text-white/80'}`}>
+      <span
+        className={`text-[11px] font-medium short-landscape:hidden ${isHangup ? 'text-white/90' : 'text-white/80'}`}
+      >
         {label}
       </span>
     </button>

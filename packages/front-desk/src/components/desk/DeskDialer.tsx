@@ -66,7 +66,7 @@ export default function DeskDialer({ onCall, disabled = false, initialValue = ''
             type="button"
             onClick={() => appendDigit(key)}
             disabled={disabled}
-            className="aspect-square max-h-[76px] rounded-2xl bg-desk-keypad hover:bg-slate-100 text-2xl font-medium text-slate-800 transition-colors active:scale-95 disabled:opacity-40 border border-slate-100"
+            className="aspect-square max-h-[min(76px,12vmin)] rounded-2xl bg-desk-keypad hover:bg-slate-100 text-2xl landscape:text-xl font-medium text-slate-800 transition-colors active:scale-95 disabled:opacity-40 border border-slate-100"
           >
             {key}
           </button>

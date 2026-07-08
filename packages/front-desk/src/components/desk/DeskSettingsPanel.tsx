@@ -81,7 +81,7 @@ export default function DeskSettingsPanel({
   const serverUrl = getApiBase();
 
   return (
-    <div className="flex flex-col h-full max-w-4xl gap-4 overflow-y-auto min-h-0 pr-1">
+    <div className="flex flex-col h-full max-w-4xl w-full gap-4 overflow-y-auto min-h-0 pr-1">
       <h2 className="text-xl sm:text-2xl font-bold text-slate-800 px-0.5 shrink-0">Settings</h2>
 
       {onServerSetup && (

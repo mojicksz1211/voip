@@ -17,7 +17,6 @@ import {
   getRoomGreeting,
 } from "@hotel-voip/shared";
 import { useGuestConfirm } from "../hooks/useGuestConfirm";
-import { useAdminPin } from "../hooks/useAdminPin";
 import { isKioskPinned, setKioskPinned } from "../utils/guestStorage";
 import {
   enableKioskMode,
@@ -88,7 +87,6 @@ export default function GuestTablet({
 }: GuestTabletProps) {
   const isNative = Capacitor.isNativePlatform();
   const { confirm, dismissPending, dialog } = useGuestConfirm();
-  const { requirePin, pinDialog } = useAdminPin();
   const [activeTab, setActiveTab] = useState<"intercom" | "requests">("intercom");
   
   // Custom quick response items
@@ -199,11 +197,7 @@ export default function GuestTablet({
     }
   }, [isCallActive, currentCall?.callId, dismissPending]);
 
-  const handleUnlinkWithConfirm = async (skipPin = false) => {
-    if (isNative && !skipPin) {
-      const pinOk = await requirePin();
-      if (!pinOk) return;
-    }
+  const handleUnlinkWithConfirm = async () => {
     const ok = await confirm({
       title: "Unlink this tablet?",
       message: `Unregister Room ${roomNum} from the hotel VoIP system? You will need to enter the room number again.`,
@@ -214,14 +208,13 @@ export default function GuestTablet({
     if (ok) onUnregister();
   };
 
-  const handleAdminAccess = async () => {
-    const pinOk = await requirePin();
-    if (pinOk) setShowAdminMenu(true);
+  const handleAdminAccess = () => {
+    setShowAdminMenu(true);
   };
 
   const handleAdminUnlink = () => {
     setShowAdminMenu(false);
-    void handleUnlinkWithConfirm(true);
+    void handleUnlinkWithConfirm();
   };
 
   const handleToggleRetroHandset = () => {
@@ -237,12 +230,10 @@ export default function GuestTablet({
     setShowAdminMenu(false);
 
     if (kioskPinned) {
-      const pinOk = await requirePin();
-      if (!pinOk) return;
       const ok = await confirm({
         title: "Unpin this app?",
         message:
-          "Only staff can unpin. Guests cannot permanently leave while pinned — the app returns automatically.",
+          "Guests cannot permanently leave while pinned — the app returns automatically.",
         confirmLabel: "Yes, Unpin",
         cancelLabel: "No",
         variant: "danger",
@@ -256,7 +247,7 @@ export default function GuestTablet({
       const ok = await confirm({
         title: "Pin this app?",
         message:
-          "Locks the tablet in kiosk mode. If guests use Back+Overview, the app will return and re-pin automatically. Only staff PIN can unpin.",
+          "Locks the tablet in kiosk mode. If guests use Back+Overview, the app will return and re-pin automatically.",
         confirmLabel: "Yes, Pin App",
         cancelLabel: "No",
       });
@@ -336,7 +327,7 @@ export default function GuestTablet({
     return (
       <div
         id="guest-sub-lobby"
-        className={`bg-white h-full p-8 flex flex-col items-center justify-center relative overflow-hidden select-none ${
+        className={`bg-white h-full p-6 landscape:p-4 flex flex-col items-center justify-center relative overflow-hidden select-none ${
           isNative ? "rounded-none border-0" : "rounded-3xl border border-slate-200/80 shadow-sm"
         }`}
       >
@@ -351,7 +342,7 @@ export default function GuestTablet({
           Please enter your room number to register the VoIP SIP extension.
         </p>
 
-        <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200/60 shadow-sm w-full max-w-sm">
+        <div className="bg-slate-50 p-5 landscape:p-4 rounded-2xl border border-slate-200/60 shadow-sm w-full max-w-md mx-auto landscape:max-w-lg">
           <label className="block text-[11px] font-sans font-bold text-slate-500 mb-2 uppercase tracking-wider text-center">
             ROOM NUMBER (GUEST ROOM NO.)
           </label>
@@ -376,7 +367,6 @@ export default function GuestTablet({
           </p>
         </div>
         {dialog}
-        {pinDialog}
       </div>
     );
   }
@@ -430,10 +420,10 @@ export default function GuestTablet({
       )}
 
       {/* Unified header: room info + tabs + clock */}
-      <div className="bg-white px-4 sm:px-5 py-3 border-b border-slate-100 shrink-0 select-none safe-area-pt">
-        <div className="flex items-center gap-3 sm:gap-4 flex-wrap">
+      <div className="bg-white px-4 sm:px-5 py-3 landscape:py-2 short:py-1.5 border-b border-slate-100 shrink-0 select-none safe-area-pt">
+        <div className="flex items-center gap-3 sm:gap-4 landscape:gap-2 flex-wrap landscape:flex-nowrap">
           <div
-            className="flex items-center gap-3 min-w-0 w-full sm:w-auto sm:flex-1 order-1"
+            className="flex items-center gap-3 min-w-0 w-full sm:w-auto sm:flex-1 landscape:flex-1 order-1"
             onTouchStart={startAdminLongPress}
             onTouchEnd={cancelAdminLongPress}
             onTouchCancel={cancelAdminLongPress}
@@ -460,7 +450,7 @@ export default function GuestTablet({
             </div>
           </div>
 
-          <div className="flex gap-1.5 order-3 sm:order-2 w-full sm:w-auto">
+          <div className="flex gap-1.5 order-3 sm:order-2 landscape:order-2 landscape:flex-none w-full sm:w-auto">
             <button
               type="button"
               onClick={() => setActiveTab("intercom")}
@@ -494,10 +484,10 @@ export default function GuestTablet({
             {isNative ? (
               <button
                 type="button"
-                onClick={() => void handleAdminAccess()}
+                onClick={handleAdminAccess}
                 className="text-xs sm:text-sm font-bold uppercase px-3 py-2 border border-slate-200 text-slate-500 rounded-xl hover:bg-slate-100 hover:text-slate-800 transition-colors"
               >
-                Admin
+                Settings
               </button>
             ) : (
               <button
@@ -513,7 +503,7 @@ export default function GuestTablet({
       </div>
 
       {/* Main Container screen content split */}
-      <div className="flex-1 flex flex-col lg:flex-row min-h-0 bg-white">
+      <div className="flex-1 flex flex-col portrait:lg:flex-row md:landscape:flex-row min-h-0 bg-white">
         
         {/* Left Side Content (Services / Action area) */}
         <div className="flex-1 p-4 flex flex-col min-h-0 overflow-y-auto">
@@ -536,7 +526,7 @@ export default function GuestTablet({
                   Speed Dial — Reception & Services
                 </h5>
                 
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-2 md:grid-cols-3 landscape:grid-cols-3 gap-4 landscape:gap-2 [&>button]:landscape:p-3">
                   {/* Front Desk Button */}
                   <button
                     onClick={() => handleCall("000")}
@@ -632,7 +622,7 @@ export default function GuestTablet({
                 <h5 className="text-sm sm:text-base font-sans font-bold text-slate-500 mb-4 uppercase tracking-widest text-center">
                   Choose a Request
                 </h5>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-2 md:grid-cols-3 landscape:grid-cols-3 gap-4 landscape:gap-2 [&>button]:landscape:p-3">
                   {requestCatalog.map((catalog) => {
                     const IconComp = catalog.icon;
                     const isSelected = selectedReqType === catalog.type;
@@ -704,16 +694,16 @@ export default function GuestTablet({
         </div>
 
         {/* Right Side Content (Call Status / Requests Backlog tracker Sidebar) */}
-        <div className="w-full lg:w-72 bg-slate-50 border-t lg:border-t-0 lg:border-l border-slate-200 p-4 flex flex-col justify-between shrink-0 min-h-[200px] sm:min-h-[240px] lg:min-h-0 select-none">
-          <div className="flex-1 flex flex-col justify-between min-h-0">
+        <div className="w-full portrait:lg:w-72 md:landscape:w-64 bg-slate-50 border-t portrait:lg:border-t-0 md:landscape:border-t-0 portrait:lg:border-l md:landscape:border-l border-slate-200 p-4 landscape:p-3 flex flex-col min-h-0 shrink-0 select-none">
+          <div className="flex-1 flex flex-col min-h-0">
             {/* Request Status Monitor */}
-            <div>
-              <h6 className="text-[10px] font-mono font-bold text-slate-400 mb-2 uppercase tracking-widest flex items-center gap-1">
+            <div className="flex-1 flex flex-col min-h-0">
+              <h6 className="text-[10px] font-mono font-bold text-slate-400 mb-2 uppercase tracking-widest flex items-center gap-1 shrink-0">
                 <History className="w-3.5 h-3.5" />
                 <span>Current Requests</span>
               </h6>
 
-              <div className="space-y-2 overflow-y-auto max-h-[160px] pr-1">
+              <div className="space-y-2 overflow-y-auto flex-1 min-h-0 pr-1">
                 {requests.filter(r => r.roomNumber === roomNum).length === 0 ? (
                   <div className="p-3 border border-dashed rounded-lg bg-white border-slate-200 text-center text-[10px] font-mono text-slate-400">
                     No active requests for this room.
@@ -760,7 +750,7 @@ export default function GuestTablet({
             </div>
 
             {/* Offline VoIP instruction notice block */}
-            <div className="mt-4 pt-3 border-t border-slate-200 text-[10px] text-slate-400 font-mono space-y-1">
+            <div className="mt-3 landscape:mt-2 pt-3 landscape:pt-2 border-t border-slate-200 text-[10px] text-slate-400 font-mono space-y-1 shrink-0">
               <div className="flex items-center gap-1.5 text-slate-500">
                 <Layers className="w-3.5 h-3.5 text-slate-400" />
                 <span className="font-bold uppercase tracking-wider">SIP REGISTER INFO</span>
@@ -773,7 +763,6 @@ export default function GuestTablet({
         </div>
       </div>
       {!isCallActive && dialog}
-      {pinDialog}
       <AdminMenuDialog
         open={showAdminMenu}
         kioskPinned={kioskPinned}

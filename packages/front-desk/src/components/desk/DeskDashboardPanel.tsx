@@ -291,7 +291,7 @@ export default function DeskDashboardPanel({
               </span>
             </div>
           </div>
-          <div className="max-h-[280px] overflow-y-auto py-2">
+          <div className="flex-1 min-h-0 max-h-[min(280px,40dvh)] overflow-y-auto py-2">
             {guestRooms.length === 0 ? (
               <div className="py-10 px-6 text-center">
                 <Building2 className="w-8 h-8 mx-auto mb-2 text-slate-300" />
@@ -367,7 +367,7 @@ export default function DeskDashboardPanel({
                 onAction={() => onNavChange('recents')}
               />
             </div>
-            <div className="max-h-[220px] overflow-y-auto">
+            <div className="flex-1 min-h-0 max-h-[min(220px,32dvh)] overflow-y-auto">
               {recentCalls.length === 0 ? (
                 <div className="py-8 px-6 text-center">
                   <Phone className="w-7 h-7 mx-auto mb-2 text-slate-300" />
@@ -418,7 +418,7 @@ export default function DeskDashboardPanel({
                 onAction={() => onNavChange('requests')}
               />
             </div>
-            <div className="max-h-[220px] overflow-y-auto">
+            <div className="flex-1 min-h-0 max-h-[min(220px,32dvh)] overflow-y-auto">
               {recentRequests.length === 0 ? (
                 <div className="py-8 px-6 text-center">
                   <Bell className="w-7 h-7 mx-auto mb-2 text-slate-300" />

@@ -27,7 +27,7 @@ export default function DeskConfirmDialog({
       : 'bg-desk-primary hover:bg-desk-primary-dark text-white';
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 landscape:p-3 safe-call-inset">
       <button
         type="button"
         className="absolute inset-0 bg-slate-900/40 backdrop-blur-[1px]"
@@ -38,7 +38,7 @@ export default function DeskConfirmDialog({
         role="dialog"
         aria-modal="true"
         aria-labelledby="desk-confirm-title"
-        className="relative w-full max-w-sm bg-white rounded-2xl desk-shadow-elevated border border-slate-100 p-5 animate-fadeIn"
+        className="relative w-full max-w-sm max-h-[min(90dvh,calc(100dvh-2rem))] landscape:max-h-[85dvh] overflow-y-auto bg-white rounded-2xl desk-shadow-elevated border border-slate-100 p-5 animate-fadeIn"
       >
         <h3 id="desk-confirm-title" className="text-base font-bold text-slate-900">
           {title}

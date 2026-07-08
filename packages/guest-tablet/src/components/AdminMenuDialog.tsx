@@ -33,9 +33,9 @@ export default function AdminMenuDialog({
         aria-modal="true"
         className="bg-white rounded-2xl shadow-2xl border border-slate-100 p-5 animate-fadeIn"
       >
-        <h3 className="text-base font-bold text-slate-900 mb-1">Staff Admin</h3>
-        <p className="text-sm text-slate-600 mb-4">Choose an action for this tablet.</p>
-        <div className="space-y-2 max-h-[60vh] overflow-y-auto">
+        <h3 className="text-base font-bold text-slate-900 mb-1">Settings</h3>
+        <p className="text-sm text-slate-600 mb-4">Configure this tablet.</p>
+        <div className="space-y-2 max-h-[min(60vh,calc(100dvh-8rem))] landscape:max-h-[70dvh] overflow-y-auto">
           <button
             type="button"
             onClick={onToggleRetroHandset}
