@@ -111,11 +111,9 @@ export function enableSpeakerForCall(): void {
 }
 
 /** Re-apply connected routing after LiveKit/WebRTC starts (can override AudioManager). */
-const CONNECTED_AUDIO_REASSERT_MS = [0, 1000] as const;
-const CONNECTED_AUDIO_FULL_RESYNC_MS = [800] as const;
+const CONNECTED_AUDIO_REASSERT_MS = [0, 300] as const;
 
 let reassertGeneration = 0;
-let resyncGeneration = 0;
 
 export function reassertConnectedCallAudio(withMic = false, forceSpeaker = false): () => void {
   if (!isAndroidNative) return () => {};
@@ -132,17 +130,7 @@ export function reassertConnectedCallAudio(withMic = false, forceSpeaker = false
 }
 
 export function resyncConnectedCallAudio(withMic = false, forceSpeaker = false): () => void {
-  if (!isAndroidNative) return () => {};
-  const generation = ++resyncGeneration;
-  const timers = CONNECTED_AUDIO_FULL_RESYNC_MS.map((delay) =>
-    window.setTimeout(() => {
-      if (generation !== resyncGeneration) return;
-      applyCallAudioState('connected', { withMic, forceSpeaker, reassertOnly: false });
-    }, delay),
-  );
-  return () => {
-    timers.forEach((id) => window.clearTimeout(id));
-  };
+  return reassertConnectedCallAudio(withMic, forceSpeaker);
 }
 
 /** Single native call — avoids async stop/start races between plugin methods. */

@@ -66,6 +66,14 @@ export function getLiveKitWsUrl(): string {
   return 'ws://127.0.0.1:7880';
 }
 
+/**
+ * Hotel LAN: skip public STUN/TURN so ICE completes on host candidates only.
+ * Avoids multi-second STUN binding timeouts when the PBX and devices share a subnet.
+ */
+export function getLanRtcConfig(): RTCConfiguration {
+  return { iceServers: [] };
+}
+
 /** Ignore loopback LiveKit URLs pushed from another client (e.g. front desk on localhost). */
 export function isUsableLiveKitWsUrl(url: string): boolean {
   try {

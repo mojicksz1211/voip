@@ -21,7 +21,6 @@ import {
 import {
   applyCallAudioState,
   reassertConnectedCallAudio,
-  resyncConnectedCallAudio,
   routeCallAudio,
   resetCallAudioRoute,
   startNativeRingtone,
@@ -117,6 +116,15 @@ export function useGuestPbx() {
 
   const openMicForCall = useCallback(async (): Promise<boolean> => {
     if (!isAndroidNative) return true;
+    const existing = micStreamRef.current?.getAudioTracks()[0];
+    if (existing?.readyState === "live") {
+      const connected = currentCallRef.current?.status === "connected";
+      existing.enabled = connected;
+      if (connected) {
+        applyCallAudioState("connected", { withMic: true, forceSpeaker: speakerOnRef.current });
+      }
+      return true;
+    }
     try {
       clearMicStream();
       micStreamRef.current = await acquireMicrophone({ profile: resolveMicProfile('guest') });
@@ -159,11 +167,11 @@ export function useGuestPbx() {
       getAudioContext: () => playbackContextRef.current,
       remotePlaybackVolume: getRetroHandsetMode() ? RETRO_HANDSET_REMOTE_PLAYBACK_CAP : 1,
       liveKitMicCapture: () => resolveLiveKitMicCapture('guest'),
+      preferWiredCaptureDevice: getRetroHandsetMode(),
       onRemoteAudioStart: () => {
         if (isAndroidNative && !getRetroHandsetMode()) {
           const withMic = Boolean(micStreamRef.current);
           reassertConnectedCallAudio(withMic, speakerOnRef.current);
-          resyncConnectedCallAudio(withMic, speakerOnRef.current);
         }
       },
     },
@@ -455,10 +463,19 @@ export function useGuestPbx() {
   }, [currentCall?.callId, currentCall?.status, roomNum]);
 
   useEffect(() => {
+    if (!isAndroidNative) return;
+    const incoming =
+      currentCall?.toExt === roomNum && currentCall.status === "ringing";
+    if (incoming && !micStreamRef.current) {
+      void openMicForCall();
+    }
+  }, [currentCall?.callId, currentCall?.status, currentCall?.toExt, roomNum, openMicForCall]);
+
+  useEffect(() => {
     if (!isAndroidNative || currentCall?.status !== "connected") return;
     if (isVoiceConnected) {
       const withMic = Boolean(micStreamRef.current);
-      return resyncConnectedCallAudio(withMic, speakerOnRef.current);
+      return reassertConnectedCallAudio(withMic, speakerOnRef.current);
     }
   }, [currentCall?.callId, currentCall?.status, isVoiceConnected]);
 
@@ -550,14 +567,21 @@ export function useGuestPbx() {
 
   const handleAnswerCall = useCallback(
     async (callId: string) => {
-      if (!(await openMicForCall())) return;
-
       try {
-        await apiFetch("/api/sip/answer", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ callId }),
-        });
+        const [micOk] = await Promise.all([
+          openMicForCall(),
+          apiFetch("/api/sip/answer", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ callId }),
+          }).then(async (res) => {
+            if (!res.ok) throw new Error("Answer failed");
+            return res;
+          }),
+        ]);
+        if (!micOk) {
+          clearMicStream();
+        }
       } catch (e) {
         clearMicStream();
         console.error("Answer API failed:", e);

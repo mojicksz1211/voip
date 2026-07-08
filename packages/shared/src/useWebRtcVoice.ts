@@ -50,13 +50,8 @@ export function useWebRtcVoice(
       return;
     }
 
-    const localMicLive =
-      managerOptionsRef.current?.getLocalStream?.()?.getAudioTracks()[0]?.readyState === 'live';
-    const localMicEnabled =
-      managerOptionsRef.current?.getLocalStream?.()?.getAudioTracks()[0]?.enabled === true;
-    const mayStart =
-      call.status === 'connected' ||
-      (call.status === 'ringing' && localMicLive && localMicEnabled);
+    // Connect during ring (deferPublish) so token/WS/ICE are ready before answer — mic not required yet.
+    const mayStart = call.status === 'connected' || call.status === 'ringing';
     if (!mayStart) {
       return;
     }

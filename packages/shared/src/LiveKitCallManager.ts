@@ -1,6 +1,6 @@
 import { Room, RoomEvent, Track, AudioPresets } from 'livekit-client';
 import type { RemoteAudioTrack } from 'livekit-client';
-import { apiFetch, getLiveKitWsUrl } from './api';
+import { apiFetch, getLanRtcConfig, getLiveKitWsUrl } from './api';
 import {
   DESKTOP_VOICE_CAPTURE,
   ANDROID_RAW_MIC_CAPTURE,
@@ -73,9 +73,6 @@ function androidLiveKitMicCapture(options?: LiveKitCallManagerOptions) {
   return isAndroidUserAgent() ? ANDROID_CAPTURE : ANDROID_RAW_MIC_CAPTURE;
 }
 
-function captureUsesAec(capture: Record<string, boolean>) {
-  return capture.echoCancellation === true || capture.googEchoCancellation === true;
-}
 
 function publishOptionsForCapture(_capture: Record<string, boolean>) {
   if (isAndroidUserAgent()) {
@@ -133,8 +130,8 @@ export class LiveKitCallManager {
   }
 
   private shouldDeferMicForAec() {
-    if (!isAndroidUserAgent()) return false;
-    return captureUsesAec(androidLiveKitMicCapture(this.options));
+    // Android uses AudioManager MODE_IN_COMMUNICATION AEC — publish mic immediately on connect.
+    return false;
   }
 
   private async tryPublishDeferredMic() {
@@ -173,7 +170,7 @@ export class LiveKitCallManager {
     this.remoteAudioTracks.push(audioTrack);
 
     void element.play().catch(() => {
-      window.setTimeout(() => void element.play().catch(() => {}), 100);
+      void element.play().catch(() => {});
     });
 
     this.options?.onRemoteAudioStart?.();
@@ -359,7 +356,9 @@ export class LiveKitCallManager {
     this.watchRoomConnection();
 
     try {
-      await this.room.connect(connectUrl, data.token);
+      await this.room.connect(connectUrl, data.token, {
+        rtcConfig: getLanRtcConfig(),
+      });
       this.roomConnected = true;
 
       if (connectOptions?.deferPublish) {
