@@ -5,6 +5,8 @@ export interface SIPExtension {
   clientType: 'guest' | 'staff' | 'front_desk';
   lastSeen: Date;
   ip: string;
+  /** Front desk / staff: reject inbound calls when true. */
+  dnd?: boolean;
 }
 
 export interface SIPMessage {

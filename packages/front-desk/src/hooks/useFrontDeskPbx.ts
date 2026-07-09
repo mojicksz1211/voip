@@ -39,9 +39,14 @@ import {
   enableSpeakerForCall,
 } from "../utils/callAudio";
 import {
+  formatInviteError,
+  type InviteErrorBody,
+} from "@hotel-voip/shared";
+import {
   getDeskAudioSettings,
   type DeskAudioSettings,
 } from "../utils/deskAudioSettings";
+import { setDnd as cacheDeskDnd, getDnd as readCachedDeskDnd } from "../utils/deskHelpers";
 
 const DESK_EXT = "000";
 const DESK_STATE_REFRESH_MS = 25_000;
@@ -444,6 +449,12 @@ export function useFrontDeskPbx() {
 
   const handleInitiateCall = useCallback(
     async (toExt: string) => {
+      const deskExt = extensions.find((ex) => ex.extension === DESK_EXT);
+      if (deskExt?.dnd) {
+        alert("Cannot place calls while Do Not Disturb is enabled.");
+        return;
+      }
+
       if (!(await openMicForCall())) return;
 
       try {
@@ -452,10 +463,10 @@ export function useFrontDeskPbx() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ fromExt: DESK_EXT, toExt }),
         });
-        const data = await res.json();
+        const data = (await res.json()) as InviteErrorBody & { callId?: string };
         if (!res.ok) {
           clearMicStream();
-          alert(`Failed placing VoIP Call: ${data.error || "Receiver busy / off"}`);
+          alert(`Failed placing VoIP Call: ${formatInviteError(data, toExt)}`);
           return;
         }
 
@@ -547,11 +558,59 @@ export function useFrontDeskPbx() {
     }
   }, []);
 
+  const deskExtension = extensions.find((ex) => ex.extension === DESK_EXT);
+  const deskDnd = Boolean(deskExtension?.dnd);
+  const deskOnline = deskExtension?.status !== "offline";
+
+  useEffect(() => {
+    if (deskExtension && typeof deskExtension.dnd === "boolean") {
+      cacheDeskDnd(deskExtension.dnd);
+    }
+  }, [deskExtension?.dnd]);
+
+  useEffect(() => {
+    void apiFetch("/api/sip/presence", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ extension: DESK_EXT, dnd: readCachedDeskDnd() }),
+    }).catch(() => {});
+  }, []);
+
+  const setDeskDnd = useCallback(async (enabled: boolean) => {
+    cacheDeskDnd(enabled);
+    await apiFetch("/api/sip/presence", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ extension: DESK_EXT, dnd: enabled }),
+    });
+  }, []);
+
+  const setDeskAvailability = useCallback(async (available: boolean) => {
+    if (available) {
+      cacheDeskDnd(false);
+      await apiFetch("/api/sip/presence", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ extension: DESK_EXT, available: true, dnd: false }),
+      });
+      return;
+    }
+    await apiFetch("/api/sip/unregister", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ extension: DESK_EXT }),
+    });
+  }, []);
+
   return {
     extensions,
     calls,
     requests,
     currentCall,
+    deskDnd,
+    deskOnline,
+    setDeskDnd,
+    setDeskAvailability,
     handleInitiateCall,
     handleHangupCall,
     handleAnswerCall,

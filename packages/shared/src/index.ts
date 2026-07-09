@@ -5,6 +5,7 @@ export * from './types';
 export * from './api';
 export * from './greeting';
 export * from './extensionPresence';
+export * from './inviteErrors';
 export * from './LiveKitCallManager';
 export * from './useWebRtcVoice';
 export { telephonyAudio, default as AudioEngine } from './AudioEngine';

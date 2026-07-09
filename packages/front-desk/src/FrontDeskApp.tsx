@@ -80,6 +80,10 @@ function FrontDeskShell() {
           notificationPermission={notifPerm.permission}
           onRequestNotifications={handleRequestNotifications}
           onServerSetup={isNative ? () => setShowServerSetup(true) : undefined}
+          deskDnd={pbx.deskDnd}
+          deskOnline={pbx.deskOnline}
+          onSetDeskDnd={pbx.setDeskDnd}
+          onSetDeskAvailability={pbx.setDeskAvailability}
         />
       </main>
     </div>

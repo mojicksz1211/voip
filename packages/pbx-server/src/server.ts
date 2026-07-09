@@ -35,7 +35,8 @@ Object.entries(DEFAULT_STAFF_EXTENSIONS).forEach(([ext, meta]) => {
     status: "online",
     clientType: meta.clientType,
     lastSeen: new Date(),
-    ip: "127.0.0.1"
+    ip: "127.0.0.1",
+    dnd: false,
   };
 });
 
@@ -414,6 +415,7 @@ async function startServer() {
       clientType: "guest",
       lastSeen: new Date(),
       ip,
+      dnd: false,
     };
 
     const callId = `reg-cid-${Math.random().toString(36).substr(2, 9)}`;
@@ -454,6 +456,38 @@ async function startServer() {
     res.json({ success: true });
   });
 
+  app.post("/api/sip/presence", (req, res) => {
+    const { extension, dnd, available } = req.body as {
+      extension?: string;
+      dnd?: boolean;
+      available?: boolean;
+    };
+
+    if (!extension || !extensions[extension]) {
+      return res.status(404).json({ error: "Extension not registered." });
+    }
+
+    const extObj = extensions[extension];
+    if (extObj.clientType === "guest") {
+      return res.status(400).json({ error: "Presence is not available for guest extensions." });
+    }
+
+    if (typeof dnd === "boolean") {
+      extObj.dnd = dnd;
+    }
+
+    if (available === true) {
+      extObj.status = "online";
+      extObj.dnd = false;
+    } else if (available === false) {
+      extObj.status = "offline";
+    }
+
+    broadcast("extension-update", { extension: extObj });
+    broadcastExtensionChange();
+    res.json({ success: true, extension: extObj });
+  });
+
   app.post("/api/sip/invite", (req, res) => {
     const { fromExt, toExt } = req.body;
     reconcileExtensionStatus(fromExt);
@@ -471,18 +505,63 @@ async function startServer() {
     }
 
     if (to.status === "offline") {
-      return res.status(404).json({ error: `Extension ${toExt} is not online.` });
+      return res.status(404).json({
+        error: to.clientType === "front_desk"
+          ? "Front desk is offline."
+          : `Extension ${toExt} is not online.`,
+        code: "OFFLINE",
+      });
+    }
+
+    if (from.dnd) {
+      const callId = `err-cid-${Math.random().toString(36).substr(2, 9)}`;
+      logSIPPacket("INVITE", fromExt, from.name, toExt, to.name, callId);
+      logSIPPacket("BYE", fromExt, from.name, toExt, to.name, callId, 486, "Do Not Disturb");
+      return res.status(486).json({
+        error: "Cannot place calls while Do Not Disturb is enabled.",
+        code: "DND",
+      });
+    }
+
+    if (to.dnd) {
+      const callId = `err-cid-${Math.random().toString(36).substr(2, 9)}`;
+      logSIPPacket("INVITE", fromExt, from.name, toExt, to.name, callId);
+      logSIPPacket("BYE", toExt, to.name, fromExt, from.name, callId, 486, "Do Not Disturb");
+      const callRecord: CallRecord = {
+        id: Math.random().toString(36).substr(2, 9),
+        fromExt,
+        fromName: from.name,
+        toExt,
+        toName: to.name,
+        status: "busy",
+        duration: 0,
+        timestamp: new Date().toISOString(),
+      };
+      calls.push(callRecord);
+      broadcast("extension-change", { extensions: Object.values(extensions), calls });
+      return res.status(486).json({
+        error: to.clientType === "front_desk"
+          ? "Front desk is unavailable (Do Not Disturb)."
+          : `${to.name} is unavailable (Do Not Disturb).`,
+        code: "DND",
+      });
     }
 
     if (from.status === "busy" || from.status === "ringing") {
-      return res.status(486).json({ error: `Extension ${fromExt} is already on a call.` });
+      return res.status(486).json({
+        error: `Extension ${fromExt} is already on a call.`,
+        code: "BUSY",
+      });
     }
 
     if (to.status === "busy" || to.status === "ringing") {
       const callId = `err-cid-${Math.random().toString(36).substr(2, 9)}`;
       logSIPPacket("INVITE", fromExt, from.name, toExt, to.name, callId);
       logSIPPacket("BYE", toExt, to.name, fromExt, from.name, callId, 486, "Busy Here");
-      return res.status(486).json({ error: `Extension ${toExt} is currently busy.` });
+      return res.status(486).json({
+        error: `Extension ${toExt} is currently busy.`,
+        code: "BUSY",
+      });
     }
 
     const callId = `call-cid-${Math.random().toString(36).substr(2, 9)}`;

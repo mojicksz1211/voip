@@ -19,8 +19,6 @@ import {
   type OperatorStatus,
   getAutoAnswer,
   setAutoAnswer,
-  getDnd,
-  setDnd,
 } from '../utils/deskHelpers';
 
 const DESK_EXT = '000';
@@ -48,6 +46,10 @@ interface FrontDeskProps {
   notificationPermission?: NotificationPermission | 'unsupported';
   onRequestNotifications?: () => void;
   onServerSetup?: () => void;
+  deskDnd?: boolean;
+  deskOnline?: boolean;
+  onSetDeskDnd?: (enabled: boolean) => Promise<void>;
+  onSetDeskAvailability?: (available: boolean) => Promise<void>;
 }
 
 export default function FrontDesk({
@@ -72,13 +74,21 @@ export default function FrontDesk({
   notificationPermission = 'default',
   onRequestNotifications = () => {},
   onServerSetup,
+  deskDnd = false,
+  deskOnline = true,
+  onSetDeskDnd,
+  onSetDeskAvailability,
 }: FrontDeskProps) {
   const [activeNav, setActiveNav] = useState<DeskNav>('dashboard');
   const [autoAnswer, setAutoAnswerState] = useState(() => getAutoAnswer());
-  const [dnd, setDndState] = useState(() => getDnd());
-  const [operatorStatus, setOperatorStatus] = useState<OperatorStatus>('online');
   const [dialSeed, setDialSeed] = useState('');
 
+  const operatorStatus: OperatorStatus = !deskOnline
+    ? 'offline'
+    : deskDnd
+      ? 'dnd'
+      : 'online';
+  const effectiveDnd = deskDnd;
   const pendingRequests = requests.filter((r) => r.status === 'pending').length;
   const isIncomingCall =
     Boolean(currentCall) &&
@@ -92,8 +102,6 @@ export default function FrontDesk({
   const showCallOverlay =
     Boolean(currentCall) && !isIncomingCall && !isOutgoingRinging && !isConnectedCall;
 
-  const effectiveDnd = dnd || operatorStatus === 'dnd';
-
   const handleToggleAutoAnswer = useCallback(() => {
     const next = !autoAnswer;
     setAutoAnswerState(next);
@@ -101,12 +109,22 @@ export default function FrontDesk({
   }, [autoAnswer]);
 
   const handleToggleDnd = useCallback(() => {
-    const next = !dnd;
-    setDndState(next);
-    setDnd(next);
-    if (next) setOperatorStatus('dnd');
-    else if (operatorStatus === 'dnd') setOperatorStatus('online');
-  }, [dnd, operatorStatus]);
+    const next = !deskDnd;
+    void onSetDeskDnd?.(next);
+  }, [deskDnd, onSetDeskDnd]);
+
+  const handleStatusChange = useCallback(
+    (status: OperatorStatus) => {
+      if (status === 'offline') {
+        void onSetDeskAvailability?.(false);
+      } else if (status === 'dnd') {
+        void onSetDeskDnd?.(true);
+      } else {
+        void onSetDeskAvailability?.(true);
+      }
+    },
+    [onSetDeskAvailability, onSetDeskDnd],
+  );
 
   const handleDial = useCallback(
     (ext: string) => {
@@ -194,16 +212,8 @@ export default function FrontDesk({
         onToggleAutoAnswer={handleToggleAutoAnswer}
         onToggleDnd={handleToggleDnd}
         operatorStatus={operatorStatus}
-        onStatusChange={(s) => {
-          setOperatorStatus(s);
-          if (s === 'dnd') {
-            setDndState(true);
-            setDnd(true);
-          } else if (s === 'online') {
-            setDndState(false);
-            setDnd(false);
-          }
-        }}
+        onStatusChange={handleStatusChange}
+        isRegistered={deskOnline}
       />
 
       {/* Desktop layout: sidebar + dialer (keypad only) + main */}

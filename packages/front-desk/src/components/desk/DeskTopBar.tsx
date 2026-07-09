@@ -45,7 +45,7 @@ export default function DeskTopBar({
     confirm({
       title: 'Enable Do Not Disturb?',
       message:
-        'Outbound calls will be blocked. Incoming calls will still ring unless you decline them.',
+        'Outbound calls will be blocked. Incoming calls will be rejected automatically — guests will see that the front desk is unavailable.',
       confirmLabel: 'Yes, Enable DND',
       cancelLabel: 'No',
       variant: 'danger',

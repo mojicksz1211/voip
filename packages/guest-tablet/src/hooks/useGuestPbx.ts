@@ -17,6 +17,8 @@ import {
   RETRO_HANDSET_REMOTE_PLAYBACK_CAP,
   subscribeRetroHandsetMode,
   useHandsetHook,
+  formatInviteError,
+  type InviteErrorBody,
 } from "@hotel-voip/shared";
 import {
   applyCallAudioState,
@@ -523,10 +525,10 @@ export function useGuestPbx() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ fromExt: roomNumRef.current, toExt }),
         });
-        const data = await res.json();
+        const data = (await res.json()) as InviteErrorBody & { callId?: string };
         if (!res.ok) {
           clearMicStream();
-          showAppAlert(`Failed placing VoIP Call: ${data.error || "Receiver busy / off"}`);
+          showAppAlert(formatInviteError(data, toExt));
           return;
         }
 

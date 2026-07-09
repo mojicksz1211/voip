@@ -168,6 +168,15 @@ export default function GuestTablet({
     onInitiateCall(toExtension);
   };
 
+  const frontDeskExt = allExtensions.find((ex) => ex.extension === "000");
+  const frontDeskUnavailable =
+    frontDeskExt?.status === "offline" || Boolean(frontDeskExt?.dnd);
+  const frontDeskUnavailableLabel = frontDeskExt?.dnd
+    ? "Do Not Disturb"
+    : frontDeskExt?.status === "offline"
+      ? "Offline"
+      : null;
+
   const handleEmergencyCall = async () => {
     const ok = await confirm({
       title: "Call Emergency?",
@@ -530,13 +539,24 @@ export default function GuestTablet({
                   {/* Front Desk Button */}
                   <button
                     onClick={() => handleCall("000")}
-                    className="p-5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl shadow-sm border border-indigo-700 flex flex-col items-center justify-center gap-2.5 transition-all group active:scale-95"
+                    disabled={frontDeskUnavailable}
+                    className={`p-5 rounded-2xl shadow-sm border flex flex-col items-center justify-center gap-2.5 transition-all group active:scale-95 ${
+                      frontDeskUnavailable
+                        ? "bg-slate-200 text-slate-500 border-slate-200 cursor-not-allowed opacity-80"
+                        : "bg-indigo-600 hover:bg-indigo-700 text-white border-indigo-700"
+                    }`}
                   >
-                    <div className="bg-white/10 p-3 rounded-xl group-hover:scale-105 transition-transform flex items-center justify-center">
-                      <PhoneCall className="w-6 h-6 text-white" />
+                    <div className={`p-3 rounded-xl transition-transform flex items-center justify-center ${
+                      frontDeskUnavailable ? "bg-white/40" : "bg-white/10 group-hover:scale-105"
+                    }`}>
+                      <PhoneCall className={`w-6 h-6 ${frontDeskUnavailable ? "text-slate-500" : "text-white"}`} />
                     </div>
                     <span className="text-sm sm:text-base font-bold tracking-tight">FRONT DESK</span>
-                    <span className="text-xs sm:text-sm text-indigo-200 font-medium">Ext 000 (Reception)</span>
+                    <span className={`text-xs sm:text-sm font-medium ${
+                      frontDeskUnavailable ? "text-slate-500" : "text-indigo-200"
+                    }`}>
+                      {frontDeskUnavailableLabel ?? "Ext 000 (Reception)"}
+                    </span>
                   </button>
 
                   {/* Housekeeping */}
