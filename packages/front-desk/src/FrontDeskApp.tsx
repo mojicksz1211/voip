@@ -97,7 +97,7 @@ export default function FrontDeskApp() {
   if (isNative && !serverReady) {
     return (
       <div className="h-[100dvh] w-screen overflow-hidden bg-desk-surface">
-        <ServerSetup onSaved={() => setServerReady(true)} />
+        <ServerSetup onSaved={() => window.location.reload()} />
       </div>
     );
   }

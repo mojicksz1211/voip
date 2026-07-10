@@ -2,12 +2,13 @@ import express from "express";
 import path from "path";
 import { fileURLToPath } from "url";
 import { SIPExtension, GuestRequest, CallRecord, SIPMessage } from "@hotel-voip/shared/types";
-import { isGuestExtensionStale, parseExtensionLastSeenMs } from "@hotel-voip/shared";
+import { isGuestExtensionStale, parseExtensionLastSeenMs } from "@hotel-voip/shared/extensionPresence";
 import {
   createParticipantToken,
   deleteCallRoom,
   ensureCallRoom,
   getServerLanIp,
+  getTailscaleIp,
   isLiveKitConfigured,
   resolveLiveKitWsUrl,
 } from "./livekit.js";
@@ -365,6 +366,19 @@ async function startServer() {
     });
   });
 
+  app.get("/api/pbx/endpoints", (_req, res) => {
+    const lanIp = getServerLanIp();
+    const tailscaleIp = getTailscaleIp();
+    res.json({
+      lan: lanIp ? `http://${lanIp}:${PORT}` : null,
+      tailscale: tailscaleIp ? `http://${tailscaleIp}:${PORT}` : null,
+      livekit: {
+        lan: lanIp ? `ws://${lanIp}:7880` : null,
+        tailscale: tailscaleIp ? `ws://${tailscaleIp}:7880` : null,
+      },
+    });
+  });
+
   app.get("/api/events", (req, res) => {
     sweepStaleGuestExtensions();
     res.setHeader("Content-Type", "text/event-stream");
@@ -624,13 +638,8 @@ async function startServer() {
     if (isLiveKitConfigured()) {
       try {
         const roomName = await ensureCallRoom(callId);
-        const lanIp = getServerLanIp();
-        const livekitUrl = lanIp ? `ws://${lanIp}:7880` : resolveLiveKitWsUrl(req);
-        broadcast("livekit:ready", {
-          callId,
-          roomName,
-          livekitUrl,
-        });
+        const livekitUrl = process.env.LIVEKIT_WS_URL ? resolveLiveKitWsUrl(req) : undefined;
+        broadcast("livekit:ready", { callId, roomName, livekitUrl });
       } catch (err) {
         console.error("LiveKit room setup failed:", err);
       }
@@ -871,6 +880,7 @@ async function startServer() {
     console.log(`  LiveKit media: ${process.env.LIVEKIT_HOST || "http://127.0.0.1:7880"} (run: npm run livekit)`);
     if (process.env.NODE_ENV !== "production") {
       const lanIp = getServerLanIp();
+      const tailscaleIp = getTailscaleIp();
       console.log(`  API + SSE only in dev mode`);
       console.log(`  Guest tablet dev: http://localhost:5173/guest/`);
       console.log(`  Front desk dev:   http://localhost:5174/`);
@@ -879,9 +889,23 @@ async function startServer() {
         console.log(`  PBX API LAN:      http://${lanIp}:${PORT}/api/`);
         console.log(`  LiveKit WS LAN:   ws://${lanIp}:7880`);
       }
+      if (tailscaleIp) {
+        console.log(`  PBX API Tailscale:      http://${tailscaleIp}:${PORT}/api/`);
+        console.log(`  LiveKit WS Tailscale:   ws://${tailscaleIp}:7880`);
+      }
     } else {
+      const lanIp = getServerLanIp();
+      const tailscaleIp = getTailscaleIp();
       console.log(`  Front desk: http://0.0.0.0:${PORT}/`);
       console.log(`  Guest tablet: http://0.0.0.0:${PORT}/guest/`);
+      if (lanIp) {
+        console.log(`  PBX API LAN:        http://${lanIp}:${PORT}/api/`);
+        console.log(`  LiveKit WS LAN:     ws://${lanIp}:7880`);
+      }
+      if (tailscaleIp) {
+        console.log(`  PBX API Tailscale:  http://${tailscaleIp}:${PORT}/api/`);
+        console.log(`  LiveKit WS Tailscale: ws://${tailscaleIp}:7880`);
+      }
     }
   });
 }

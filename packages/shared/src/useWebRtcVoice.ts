@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { CallMetadata } from './types';
-import { getLiveKitWsUrl, isUsableLiveKitWsUrl } from './api';
+import { getApiBase, getLiveKitWsUrl, isUsableLiveKitWsUrl } from './api';
 import { isAndroidUserAgent } from './audioConfig';
 import { LiveKitCallManager, type LiveKitCallManagerOptions } from './LiveKitCallManager';
 
@@ -8,6 +8,17 @@ export interface UseWebRtcVoiceOptions extends LiveKitCallManagerOptions {
   autoStart?: boolean;
   /** Android room intercom: start on loudspeaker (not earpiece). Retro handset overrides. */
   intercomSpeakerDefault?: boolean;
+}
+
+function liveKitUrlMatchesApiBase(livekitUrl: string): boolean {
+  const apiBase = getApiBase();
+  if (!apiBase) return true;
+
+  try {
+    return new URL(livekitUrl).hostname === new URL(apiBase).hostname;
+  } catch {
+    return false;
+  }
 }
 
 export function useWebRtcVoice(
@@ -149,7 +160,7 @@ export function useWebRtcVoice(
   }, [currentCall?.callId, currentCall?.status, autoStart, runStartVoice]);
 
   const setLiveKitUrl = useCallback((url: string) => {
-    if (isUsableLiveKitWsUrl(url)) {
+    if (isUsableLiveKitWsUrl(url) && liveKitUrlMatchesApiBase(url)) {
       livekitUrlRef.current = url;
     }
   }, []);

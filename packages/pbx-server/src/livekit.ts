@@ -12,11 +12,44 @@ function isLoopbackHost(hostname: string): boolean {
   return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1";
 }
 
+function isTailscaleIpv4(address: string): boolean {
+  const parts = address.split(".").map((part) => Number(part));
+  if (parts.length !== 4 || parts.some((part) => Number.isNaN(part))) {
+    return false;
+  }
+  return parts[0] === 100 && parts[1] >= 64 && parts[1] <= 127;
+}
+
+function isTailscaleInterface(name: string): boolean {
+  return /tailscale/i.test(name);
+}
+
 export function getServerLanIp(): string | null {
   const nets = os.networkInterfaces();
   for (const name of Object.keys(nets)) {
     for (const net of nets[name] ?? []) {
-      if ((net.family === "IPv4" || Number(net.family) === 4) && !net.internal) {
+      if (
+        (net.family === "IPv4" || Number(net.family) === 4) &&
+        !net.internal &&
+        !isTailscaleInterface(name) &&
+        !isTailscaleIpv4(net.address)
+      ) {
+        return net.address;
+      }
+    }
+  }
+  return null;
+}
+
+export function getTailscaleIp(): string | null {
+  const nets = os.networkInterfaces();
+  for (const name of Object.keys(nets)) {
+    for (const net of nets[name] ?? []) {
+      if (
+        (net.family === "IPv4" || Number(net.family) === 4) &&
+        !net.internal &&
+        (isTailscaleInterface(name) || isTailscaleIpv4(net.address))
+      ) {
         return net.address;
       }
     }

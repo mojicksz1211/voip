@@ -111,7 +111,7 @@ export default function InCallScreen({
           <ControlBtn
             icon={isSpeakerMuted ? VolumeX : Volume2}
             label={isSpeakerMuted ? 'Speaker off' : 'Speaker'}
-            active={isSpeakerMuted}
+            active={!isSpeakerMuted}
             onClick={onToggleSpeaker}
           />
         </div>

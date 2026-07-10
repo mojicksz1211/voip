@@ -23,6 +23,7 @@ import {
 import {
   applyCallAudioState,
   reassertConnectedCallAudio,
+  resyncConnectedCallAudio,
   routeCallAudio,
   resetCallAudioRoute,
   startNativeRingtone,
@@ -79,6 +80,7 @@ export function useGuestPbx() {
   const [retroHandset, setRetroHandset] = useState(() => getRetroHandsetMode());
   /** False on phones (proximity → earpiece); true on tablets without proximity (loudspeaker). */
   const [roomIntercomDevice, setRoomIntercomDevice] = useState(false);
+  const roomIntercomDeviceRef = useRef(false);
 
   const showAppAlert = useCallback((message: string) => {
     setAppAlert(message);
@@ -95,6 +97,8 @@ export function useGuestPbx() {
   const nativeRingCallIdRef = useRef<string | null>(null);
   /** Android: true when user enabled loudspeaker (inverse of isSpeakerMuted). */
   const speakerOnRef = useRef(false);
+  /** Ignore stale "offline" extension snapshots right after register. */
+  const registeredAtRef = useRef(0);
 
   useEffect(() => {
     currentCallRef.current = currentCall;
@@ -103,7 +107,9 @@ export function useGuestPbx() {
   useEffect(() => {
     if (!isAndroidNative) return;
     void hasProximitySensor().then((supported) => {
-      setRoomIntercomDevice(!supported);
+      const isTablet = !supported;
+      roomIntercomDeviceRef.current = isTablet;
+      setRoomIntercomDevice(isTablet);
     });
   }, []);
 
@@ -123,7 +129,10 @@ export function useGuestPbx() {
       const connected = currentCallRef.current?.status === "connected";
       existing.enabled = connected;
       if (connected) {
-        applyCallAudioState("connected", { withMic: true, forceSpeaker: speakerOnRef.current });
+        applyCallAudioState("connected", {
+          withMic: true,
+          forceSpeaker: speakerOnRef.current,
+        });
       }
       return true;
     }
@@ -136,7 +145,10 @@ export function useGuestPbx() {
       }
       const call = currentCallRef.current;
       if (call?.status === "connected") {
-        applyCallAudioState("connected", { withMic: true, forceSpeaker: speakerOnRef.current });
+        applyCallAudioState("connected", {
+          withMic: true,
+          forceSpeaker: speakerOnRef.current,
+        });
       } else {
         micStreamRef.current.getAudioTracks().forEach((track) => {
           track.enabled = false;
@@ -171,9 +183,16 @@ export function useGuestPbx() {
       liveKitMicCapture: () => resolveLiveKitMicCapture('guest'),
       preferWiredCaptureDevice: getRetroHandsetMode(),
       onRemoteAudioStart: () => {
-        if (isAndroidNative && !getRetroHandsetMode()) {
-          const withMic = Boolean(micStreamRef.current);
-          reassertConnectedCallAudio(withMic, speakerOnRef.current);
+        if (!isAndroidNative) return;
+        const withMic = Boolean(micStreamRef.current);
+        const forceSpeaker = speakerOnRef.current;
+        const isTablet = roomIntercomDeviceRef.current;
+        if (!isTablet && !forceSpeaker) {
+          routeCallAudio("connected", withMic, false);
+        }
+        reassertConnectedCallAudio(withMic, forceSpeaker, !isTablet);
+        if (isTablet) {
+          resyncConnectedCallAudio(withMic, forceSpeaker);
         }
       },
     },
@@ -356,6 +375,7 @@ export function useGuestPbx() {
     if (isRegistered && roomNum) {
       const match = extensions.find((ex) => ex.extension === roomNum);
       if (!match || match.status === "offline") {
+        if (Date.now() - registeredAtRef.current < 15_000) return;
         setIsRegistered(false);
       }
     }
@@ -375,11 +395,16 @@ export function useGuestPbx() {
   // stream survives screen-off / Doze and incoming calls always ring.
   useEffect(() => {
     if (!isAndroidNative) return;
-    if (isRegistered && roomNum) {
-      startPresenceService(roomNum, getApiBase());
-    } else {
-      stopPresenceService();
-    }
+    const timer = window.setTimeout(() => {
+      if (isRegistered && roomNum) {
+        startPresenceService(roomNum, getApiBase());
+      } else {
+        stopPresenceService();
+      }
+    }, 250);
+    return () => {
+      window.clearTimeout(timer);
+    };
   }, [isRegistered, roomNum]);
 
   // Full-screen incoming-call alert that pops over other apps / the lock screen
@@ -451,18 +476,13 @@ export function useGuestPbx() {
     stopNativeRingtone();
     nativeRingCallIdRef.current = null;
     if (audioRoutePhaseRef.current !== "connected") {
-      if (getRetroHandsetMode()) {
-        routeCallAudio("connected", withMic);
-      } else {
-        applyCallAudioState("connected", {
-          withMic,
-          forceSpeaker: speakerOnRef.current,
-        });
-      }
+      speakerOnRef.current = false;
+      routeCallAudio("connected", withMic, false);
       audioRoutePhaseRef.current = "connected";
-      return reassertConnectedCallAudio(withMic, speakerOnRef.current);
+      const isTablet = roomIntercomDeviceRef.current;
+      return reassertConnectedCallAudio(withMic, false, !isTablet);
     }
-  }, [currentCall?.callId, currentCall?.status, roomNum]);
+  }, [currentCall?.callId, currentCall?.status, roomNum, roomIntercomDevice]);
 
   useEffect(() => {
     if (!isAndroidNative) return;
@@ -477,7 +497,11 @@ export function useGuestPbx() {
     if (!isAndroidNative || currentCall?.status !== "connected") return;
     if (isVoiceConnected) {
       const withMic = Boolean(micStreamRef.current);
-      return reassertConnectedCallAudio(withMic, speakerOnRef.current);
+      const forceSpeaker = speakerOnRef.current;
+      if (roomIntercomDeviceRef.current) {
+        return resyncConnectedCallAudio(withMic, forceSpeaker);
+      }
+      return reassertConnectedCallAudio(withMic, forceSpeaker, true);
     }
   }, [currentCall?.callId, currentCall?.status, isVoiceConnected]);
 
@@ -529,6 +553,11 @@ export function useGuestPbx() {
         if (!res.ok) {
           clearMicStream();
           showAppAlert(formatInviteError(data, toExt));
+          return;
+        }
+        if (!data.callId) {
+          clearMicStream();
+          showAppAlert("The PBX server did not return a call ID. Please try again.");
           return;
         }
 
@@ -648,6 +677,7 @@ export function useGuestPbx() {
       });
       if (res.ok) {
         setRoomNum(room);
+        registeredAtRef.current = Date.now();
         setIsRegistered(true);
         lastRegisteredExtRef.current = room;
         if (isAndroidNative) {

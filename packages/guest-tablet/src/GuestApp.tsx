@@ -51,7 +51,10 @@ function GuestAppContent() {
     return (
       <div className="h-[100dvh] w-screen overflow-hidden bg-slate-900">
         <ServerSetup
-          onSaved={() => setShowAdminServerSetup(false)}
+          onSaved={() => {
+            setShowAdminServerSetup(false);
+            window.location.reload();
+          }}
           onCancel={() => setShowAdminServerSetup(false)}
         />
       </div>
@@ -86,7 +89,7 @@ export default function GuestApp() {
   if (isNative && !serverReady) {
     return (
       <div className="h-[100dvh] w-screen overflow-hidden bg-slate-900">
-        <ServerSetup onSaved={() => setServerReady(true)} />
+        <ServerSetup onSaved={() => window.location.reload()} />
       </div>
     );
   }

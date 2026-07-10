@@ -4,7 +4,8 @@
     "lib": ["ES2022"],
     "types": ["node"],
     "paths": {
-      "@hotel-voip/shared/types": ["../shared/src/types.ts"]
+      "@hotel-voip/shared/types": ["../shared/src/types.ts"],
+      "@hotel-voip/shared/extensionPresence": ["../shared/src/extensionPresence.ts"]
     }
   },
   "include": ["src/**/*"]

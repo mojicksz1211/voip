@@ -469,6 +469,11 @@ export function useFrontDeskPbx() {
           alert(`Failed placing VoIP Call: ${formatInviteError(data, toExt)}`);
           return;
         }
+        if (!data.callId) {
+          clearMicStream();
+          alert("Failed placing VoIP Call: the PBX server did not return a call ID.");
+          return;
+        }
 
         const toExtMeta = extensions.find((ex) => ex.extension === toExt);
         setCurrentCall({

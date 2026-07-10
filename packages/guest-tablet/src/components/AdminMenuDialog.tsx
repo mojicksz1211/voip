@@ -1,4 +1,5 @@
 import { Phone, Pin, PinOff, RefreshCw, Server, Unlink } from 'lucide-react';
+import { PbxConnectionSwitcher } from '@hotel-voip/shared';
 import GuestModal from './GuestModal';
 
 interface AdminMenuDialogProps {
@@ -36,6 +37,7 @@ export default function AdminMenuDialog({
         <h3 className="text-base font-bold text-slate-900 mb-1">Settings</h3>
         <p className="text-sm text-slate-600 mb-4">Configure this tablet.</p>
         <div className="space-y-2 max-h-[min(60vh,calc(100dvh-8rem))] landscape:max-h-[70dvh] overflow-y-auto">
+          <PbxConnectionSwitcher variant="guest" />
           <button
             type="button"
             onClick={onToggleRetroHandset}

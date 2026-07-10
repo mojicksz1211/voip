@@ -1,6 +1,6 @@
 import type { LucideIcon } from 'lucide-react';
 import { Bell, Headphones, Mic, Server } from 'lucide-react';
-import { getApiBase } from '@hotel-voip/shared';
+import { getApiBase, PbxConnectionSwitcher } from '@hotel-voip/shared';
 import type { DeskAudioSettings } from '../../utils/deskAudioSettings';
 import DeskAudioTuningPanel from './DeskAudioTuningPanel';
 
@@ -85,23 +85,26 @@ export default function DeskSettingsPanel({
       <h2 className="text-xl sm:text-2xl font-bold text-slate-800 px-0.5 shrink-0">Settings</h2>
 
       {onServerSetup && (
-        <SettingsCard
-          title="PBX Server"
-          icon={Server}
-          description={
-            serverUrl
-              ? `Connected to ${serverUrl}`
-              : 'Set the PC address where npm run dev is running.'
-          }
-        >
-          <button
-            type="button"
-            onClick={onServerSetup}
-            className="px-4 py-2.5 text-sm font-semibold bg-slate-100 text-slate-700 rounded-xl hover:bg-slate-200 transition-colors active:scale-95"
+        <>
+          <SettingsCard
+            title="PBX Server"
+            icon={Server}
+            description={
+              serverUrl
+                ? `Connected to ${serverUrl}`
+                : 'Set the PC address where npm run dev is running.'
+            }
           >
-            Change
-          </button>
-        </SettingsCard>
+            <button
+              type="button"
+              onClick={onServerSetup}
+              className="px-4 py-2.5 text-sm font-semibold bg-slate-100 text-slate-700 rounded-xl hover:bg-slate-200 transition-colors active:scale-95"
+            >
+              Change
+            </button>
+          </SettingsCard>
+          <PbxConnectionSwitcher variant="desk" />
+        </>
       )}
 
       <SettingsCard

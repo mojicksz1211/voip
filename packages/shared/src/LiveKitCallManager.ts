@@ -375,6 +375,16 @@ export class LiveKitCallManager {
         return;
       }
 
+      if (isAndroidUserAgent()) {
+        // Start remote playback before mic publish — Infinix AAudio mic open can block hearable RX for seconds.
+        await this.room.startAudio();
+        this.attachExistingRemoteAudio();
+        await this.publishLocalAudio();
+        this.publishCompleted = true;
+        this.onConnectionStateChange?.(true);
+        return;
+      }
+
       await this.publishLocalAudio();
       await this.room.startAudio();
       this.publishCompleted = true;
@@ -398,6 +408,15 @@ export class LiveKitCallManager {
         this.attachExistingRemoteAudio();
         await this.tryPublishDeferredMic();
       }
+      return;
+    }
+
+    if (isAndroidUserAgent()) {
+      await this.room.startAudio();
+      this.attachExistingRemoteAudio();
+      await this.publishLocalAudio();
+      this.publishCompleted = true;
+      this.onConnectionStateChange?.(true);
       return;
     }
 

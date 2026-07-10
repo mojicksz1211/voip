@@ -1,30 +1,50 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Save } from 'lucide-react';
-import { getStoredApiBase, setStoredApiBase } from '@hotel-voip/shared';
+import {
+  cachePbxEndpoints,
+  fetchPbxEndpoints,
+  getStoredApiBase,
+  setStoredApiBase,
+  testPbxConnection,
+  type PbxEndpoints,
+} from '@hotel-voip/shared';
 
 interface ServerSetupProps {
   onSaved: () => void;
   onCancel?: () => void;
 }
 
-const CONNECT_TIMEOUT_MS = 10_000;
-
-async function testPbxConnection(baseUrl: string): Promise<void> {
-  const controller = new AbortController();
-  const timeout = window.setTimeout(() => controller.abort(), CONNECT_TIMEOUT_MS);
-
-  try {
-    const res = await fetch(`${baseUrl}/api/pbx/state`, { signal: controller.signal });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  } finally {
-    window.clearTimeout(timeout);
-  }
-}
-
 export default function ServerSetup({ onSaved, onCancel }: ServerSetupProps) {
   const [url, setUrl] = useState(getStoredApiBase() ?? 'http://192.168.110.50:3000');
   const [error, setError] = useState<string | null>(null);
   const [testing, setTesting] = useState(false);
+  const [endpoints, setEndpoints] = useState<PbxEndpoints | null>(null);
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    const load = async () => {
+      const base = getStoredApiBase();
+      if (base) {
+        const data = await fetchPbxEndpoints(base);
+        if (data) setEndpoints(data);
+        return;
+      }
+
+      try {
+        const res = await fetch('/api/pbx/endpoints', { signal: controller.signal });
+        if (!res.ok) return;
+        const data = (await res.json()) as PbxEndpoints;
+        cachePbxEndpoints(data);
+        setEndpoints(data);
+      } catch {
+        // ignore
+      }
+    };
+
+    void load();
+    return () => controller.abort();
+  }, []);
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -32,13 +52,13 @@ export default function ServerSetup({ onSaved, onCancel }: ServerSetupProps) {
 
     const trimmed = url.trim().replace(/\/$/, '');
     if (!/^https?:\/\/.+/i.test(trimmed)) {
-      setError('Enter the full URL, e.g. http://192.168.110.50:3000');
+      setError('Enter the full URL, e.g. http://192.168.110.50:3000 or http://100.x.x.x:3000');
       return;
     }
 
     if (/localhost|127\.0\.0\.1/i.test(trimmed)) {
       setError(
-        "Do not use localhost — enter the PC's IP on WiFi/LAN (e.g. http://192.168.110.50:3000)."
+        "Do not use localhost — enter the PC's LAN IP or Tailscale IP (e.g. http://192.168.110.50:3000 or http://100.x.x.x:3000)."
       );
       return;
     }
@@ -47,13 +67,15 @@ export default function ServerSetup({ onSaved, onCancel }: ServerSetupProps) {
     try {
       await testPbxConnection(trimmed);
       setStoredApiBase(trimmed);
+      const discovered = await fetchPbxEndpoints(trimmed);
+      if (discovered) cachePbxEndpoints(discovered);
       onSaved();
     } catch (err) {
       const timedOut = err instanceof DOMException && err.name === 'AbortError';
       setError(
         timedOut
-          ? 'Timeout — could not reach the server. Make sure: (1) npm run dev is running on the PC, (2) the tablet and PC are on the same WiFi, (3) the IP is correct (run ipconfig on the PC).'
-          : 'Could not connect to the PBX server. Make sure WiFi is the same and the server is running on the PC.'
+          ? 'Timeout — could not reach the server. Make sure npm run dev is running, the IP is correct, and Tailscale is connected when using a 100.x.x.x address.'
+          : 'Could not connect to the PBX server. Use the LAN IP on the hotel Wi‑Fi or the Tailscale IP from another network.'
       );
     } finally {
       setTesting(false);
@@ -89,9 +111,37 @@ export default function ServerSetup({ onSaved, onCancel }: ServerSetupProps) {
               placeholder="http://192.168.110.50:3000"
               className="w-full px-4 py-3 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-desk-primary/30 font-mono"
             />
+            {(endpoints?.lan || endpoints?.tailscale) && (
+              <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {endpoints.lan && (
+                  <button
+                    type="button"
+                    onClick={() => setUrl(endpoints.lan ?? '')}
+                    className="rounded-lg border border-slate-200 px-3 py-2 text-left text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                  >
+                    Use LAN
+                    <span className="block font-mono text-[10px] font-normal text-slate-500">
+                      {endpoints.lan}
+                    </span>
+                  </button>
+                )}
+                {endpoints.tailscale && (
+                  <button
+                    type="button"
+                    onClick={() => setUrl(endpoints.tailscale ?? '')}
+                    className="rounded-lg border border-slate-200 px-3 py-2 text-left text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                  >
+                    Use Tailscale
+                    <span className="block font-mono text-[10px] font-normal text-slate-500">
+                      {endpoints.tailscale}
+                    </span>
+                  </button>
+                )}
+              </div>
+            )}
             <p className="text-[10px] text-slate-400 mt-2 leading-relaxed">
-              On the PC, open Command Prompt and run <strong>ipconfig</strong> — find the IPv4 Address
-              (e.g. 192.168.110.50), then enter: <strong>http://[IP]:3000</strong>
+              Same hotel Wi‑Fi: use the LAN IP from <strong>ipconfig</strong> (e.g. 192.168.110.50).
+              Other Wi‑Fi or mobile data: use the PC's Tailscale IP from <strong>tailscale ip -4</strong>.
             </p>
           </div>
 

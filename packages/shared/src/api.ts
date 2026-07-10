@@ -1,7 +1,15 @@
 const STORAGE_KEY = 'hotel-voip-pbx-url';
 
-function isLoopbackHost(hostname: string): boolean {
+export function isLoopbackHost(hostname: string): boolean {
   return hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1';
+}
+
+export function isTailscaleHost(hostname: string): boolean {
+  const parts = hostname.split('.').map((part) => Number(part));
+  if (parts.length !== 4 || parts.some((part) => Number.isNaN(part))) {
+    return false;
+  }
+  return parts[0] === 100 && parts[1] >= 64 && parts[1] <= 127;
 }
 
 export function getStoredApiBase(): string | null {

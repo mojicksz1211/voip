@@ -8,8 +8,11 @@
   "exports": {
     ".": "./src/index.ts",
     "./types": "./src/types.ts",
+    "./extensionPresence": "./src/extensionPresence.ts",
     "./AudioEngine": "./src/AudioEngine.ts",
-    "./api": "./src/api.ts"
+    "./api": "./src/api.ts",
+    "./pbxConnection": "./src/pbxConnection.ts",
+    "./PbxConnectionSwitcher": "./src/PbxConnectionSwitcher.tsx"
   },
   "dependencies": {
     "livekit-client": "^2.15.4"
