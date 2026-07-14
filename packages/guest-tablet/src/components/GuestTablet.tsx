@@ -650,7 +650,7 @@ export default function GuestTablet({
                       <button
                         key={catalog.type}
                         type="button"
-                        onClick={() => setSelectedReqType(catalog.type as any)}
+                        onClick={() => setSelectedReqType(catalog.type)}
                         className={`p-5 border rounded-2xl shadow-sm flex flex-col items-center justify-center gap-2.5 select-none transition-all active:scale-95 ${
                           isSelected
                             ? "ring-2 ring-indigo-500 bg-indigo-50 text-indigo-900 border-indigo-300"

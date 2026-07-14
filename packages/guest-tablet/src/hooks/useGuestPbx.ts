@@ -380,7 +380,7 @@ export function useGuestPbx() {
     if (
       isAndroidNative &&
       currentCall?.toExt === roomNum &&
-      currentCall.status === "ringing"
+      currentCall?.status === "ringing"
     ) {
       wakeScreenForCall();
     }
@@ -407,7 +407,7 @@ export function useGuestPbx() {
   useEffect(() => {
     if (!isAndroidNative) return;
     const incoming =
-      currentCall?.toExt === roomNum && currentCall.status === "ringing";
+      currentCall?.toExt === roomNum && currentCall?.status === "ringing";
     if (incoming && document.hidden) {
       presentIncomingCall("Incoming call", currentCall!.fromName);
     } else {
@@ -488,7 +488,7 @@ export function useGuestPbx() {
   useEffect(() => {
     if (!isAndroidNative) return;
     const incoming =
-      currentCall?.toExt === roomNum && currentCall.status === "ringing";
+      currentCall?.toExt === roomNum && currentCall?.status === "ringing";
     if (incoming && !micStreamRef.current) {
       void openMicForCall();
     }
@@ -513,8 +513,13 @@ export function useGuestPbx() {
   useEffect(() => {
     if (!isAndroidNative) return;
 
+    if (!currentCall) {
+      stopCallForeground();
+      return;
+    }
+
     const active =
-      currentCall?.callId &&
+      currentCall.callId &&
       (currentCall.status === "ringing" || currentCall.status === "connected");
 
     if (!active) {
