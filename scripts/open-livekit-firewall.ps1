@@ -1,5 +1,6 @@
-# Allow LiveKit media ports on Windows Firewall (run as Administrator)
+# Allow PBX API and LiveKit media ports on Windows Firewall (run as Administrator)
 $rules = @(
+  @{ Name = "Hotel VoIP PBX TCP 3000"; Port = 3000; Protocol = "TCP" },
   @{ Name = "Hotel VoIP LiveKit TCP 7880"; Port = 7880; Protocol = "TCP" },
   @{ Name = "Hotel VoIP LiveKit TCP 7881"; Port = 7881; Protocol = "TCP" },
   @{ Name = "Hotel VoIP LiveKit UDP 7882"; Port = 7882; Protocol = "UDP" },
@@ -16,4 +17,4 @@ foreach ($rule in $rules) {
   Write-Host "Added: $($rule.Name)"
 }
 
-Write-Host "Done. LiveKit ports should be reachable from tablets on your LAN."
+Write-Host "Done. PBX (TCP 3000) and LiveKit ports should be reachable from tablets on your LAN."

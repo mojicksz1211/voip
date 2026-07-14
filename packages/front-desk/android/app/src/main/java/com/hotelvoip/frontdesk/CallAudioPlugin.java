@@ -65,6 +65,8 @@ public class CallAudioPlugin extends Plugin {
     private boolean connectedForceSpeaker = false;
     private boolean connectedPhaseActive = false;
     private AudioManager.OnCommunicationDeviceChangedListener communicationDeviceListener;
+    private final Handler mainHandler = new Handler(Looper.getMainLooper());
+    private Runnable pendingAutoReroute;
     private final Executor mainExecutor = command -> {
         if (getActivity() != null) {
             getActivity().runOnUiThread(command);
@@ -439,6 +441,7 @@ public class CallAudioPlugin extends Plugin {
     public void routeCallAudio(PluginCall call) {
         String phase = call.getString("phase", "connected");
         boolean withMic = call.getBoolean("withMic", false);
+        boolean preferSpeaker = call.getBoolean("preferSpeaker", false);
 
         runAudioOnUiThread(call, () -> {
             AudioManager audioManager = (AudioManager) getContext().getSystemService(Context.AUDIO_SERVICE);
@@ -449,9 +452,10 @@ public class CallAudioPlugin extends Plugin {
             if ("ringing".equals(phase)) {
                 routeRingingCallAudio(audioManager, withMic);
             } else {
-                boolean wired = CallAudioRouting.isWiredHeadsetConnected(audioManager);
-                boolean effectiveSpeaker = !wired;
-                boolean proximityNeedsUpdate = !connectedPhaseActive || connectedForceSpeaker != effectiveSpeaker;
+                boolean effectiveSpeaker =
+                        CallAudioRouting.computeEffectiveSpeaker(audioManager, preferSpeaker);
+                boolean proximityNeedsUpdate =
+                        !connectedPhaseActive || connectedForceSpeaker != effectiveSpeaker;
 
                 nativeCallRinger.stop();
                 requestVoiceFocus(audioManager);
@@ -505,6 +509,13 @@ public class CallAudioPlugin extends Plugin {
         runAudioOnUiThread(call, () -> {
             applyIdleState((AudioManager) getContext().getSystemService(Context.AUDIO_SERVICE));
         });
+    }
+
+    @PluginMethod
+    public void hasProximitySensor(PluginCall call) {
+        JSObject ret = new JSObject();
+        ret.put("supported", CallProximityScreen.isSupported(getContext()));
+        call.resolve(ret);
     }
 
     @PluginMethod
@@ -590,8 +601,7 @@ public class CallAudioPlugin extends Plugin {
     }
 
     private void applyConnectedState(AudioManager audioManager, boolean forceSpeaker, boolean reassertOnly) {
-        boolean wired = CallAudioRouting.isWiredHeadsetConnected(audioManager);
-        boolean effectiveSpeaker = forceSpeaker || !wired;
+        boolean effectiveSpeaker = CallAudioRouting.computeEffectiveSpeaker(audioManager, forceSpeaker);
 
         if (reassertOnly && connectedPhaseActive && connectedForceSpeaker == effectiveSpeaker) {
             CallAudioRouting.reassertConnectedAudio(audioManager, effectiveSpeaker);
@@ -650,20 +660,42 @@ public class CallAudioPlugin extends Plugin {
             if (!connectedPhaseActive || connectedForceSpeaker || audioManager == null) {
                 return;
             }
-            if (device != null && device.getType() == AudioDeviceInfo.TYPE_BUILTIN_SPEAKER) {
-                if (!CallAudioRouting.hasBuiltInEarpiece(audioManager)) {
-                    return;
-                }
-                Log.i(TAG, "WebRTC switched to speaker — re-routing to earpiece");
-                synchronized (audioLock) {
-                    CallAudioRouting.prepareConnectedAudio(audioManager, true, false);
-                }
-            }
+            scheduleAutoReroute(audioManager, device);
         };
         audioManager.addOnCommunicationDeviceChangedListener(mainExecutor, communicationDeviceListener);
     }
 
+    private void scheduleAutoReroute(AudioManager audioManager, AudioDeviceInfo device) {
+        if (pendingAutoReroute != null) {
+            mainHandler.removeCallbacks(pendingAutoReroute);
+        }
+        pendingAutoReroute = () -> {
+            pendingAutoReroute = null;
+            if (!connectedPhaseActive || connectedForceSpeaker) {
+                return;
+            }
+            synchronized (audioLock) {
+                if (device != null && device.getType() == AudioDeviceInfo.TYPE_BUILTIN_SPEAKER) {
+                    if (!CallAudioRouting.hasBuiltInEarpiece(audioManager)) {
+                        if (CallAudioRouting.isExternalAudioConnected(audioManager)) {
+                            Log.i(TAG, "WebRTC switched to speaker on tablet — re-routing to external audio");
+                            CallAudioRouting.prepareDeskConnectedAudio(audioManager, true, false);
+                        }
+                        return;
+                    }
+                    Log.i(TAG, "WebRTC switched to speaker — re-routing to earpiece");
+                    CallAudioRouting.prepareConnectedAudio(audioManager, true, false);
+                }
+            }
+        };
+        mainHandler.post(pendingAutoReroute);
+    }
+
     private void unregisterCommunicationDeviceListener(AudioManager audioManager) {
+        if (pendingAutoReroute != null) {
+            mainHandler.removeCallbacks(pendingAutoReroute);
+            pendingAutoReroute = null;
+        }
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
             return;
         }

@@ -414,10 +414,24 @@ export class LiveKitCallManager {
     if (isAndroidUserAgent()) {
       await this.room.startAudio();
       this.attachExistingRemoteAudio();
-      await this.publishLocalAudio();
-      this.publishCompleted = true;
-      this.onConnectionStateChange?.(true);
-      return;
+      const retryDelaysMs = [0, 400, 1200];
+      let lastErr: unknown;
+      for (const delayMs of retryDelaysMs) {
+        if (delayMs > 0) {
+          await new Promise((resolve) => setTimeout(resolve, delayMs));
+        }
+        if (this.publishCompleted) return;
+        try {
+          await this.publishLocalAudio();
+          this.publishCompleted = true;
+          this.onConnectionStateChange?.(true);
+          return;
+        } catch (err) {
+          lastErr = err;
+          console.warn('Android mic publish retry:', err);
+        }
+      }
+      throw lastErr instanceof Error ? lastErr : new Error('Failed to publish microphone.');
     }
 
     await this.publishLocalAudio();

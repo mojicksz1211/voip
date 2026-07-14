@@ -95,6 +95,7 @@ export function useGuestPbx() {
   const currentCallRef = useRef(currentCall);
   const audioRoutePhaseRef = useRef<"idle" | "ringing" | "connected">("idle");
   const nativeRingCallIdRef = useRef<string | null>(null);
+  const postVoiceAudioRoutedRef = useRef(false);
   /** Android: true when user enabled loudspeaker (inverse of isSpeakerMuted). */
   const speakerOnRef = useRef(false);
   /** Ignore stale "offline" extension snapshots right after register. */
@@ -187,13 +188,7 @@ export function useGuestPbx() {
         const withMic = Boolean(micStreamRef.current);
         const forceSpeaker = speakerOnRef.current;
         const isTablet = roomIntercomDeviceRef.current;
-        if (!isTablet && !forceSpeaker) {
-          routeCallAudio("connected", withMic, false);
-        }
         reassertConnectedCallAudio(withMic, forceSpeaker, !isTablet);
-        if (isTablet) {
-          resyncConnectedCallAudio(withMic, forceSpeaker);
-        }
       },
     },
   );
@@ -438,6 +433,7 @@ export function useGuestPbx() {
         audioRoutePhaseRef.current === "connected";
       nativeRingCallIdRef.current = null;
       speakerOnRef.current = false;
+      postVoiceAudioRoutedRef.current = false;
       if (endingActiveCall) {
         return scheduleAndroidHangupPlayback(playHangupSound, () => {
           stopNativeRingtone();
@@ -477,10 +473,15 @@ export function useGuestPbx() {
     nativeRingCallIdRef.current = null;
     if (audioRoutePhaseRef.current !== "connected") {
       speakerOnRef.current = false;
-      routeCallAudio("connected", withMic, false);
+      postVoiceAudioRoutedRef.current = false;
       audioRoutePhaseRef.current = "connected";
       const isTablet = roomIntercomDeviceRef.current;
-      return reassertConnectedCallAudio(withMic, false, !isTablet);
+      if (isTablet) {
+        routeCallAudio("connected", withMic, false);
+        return reassertConnectedCallAudio(withMic, false, false);
+      }
+      // Phone: defer native routing until LiveKit is connected (avoids killing WebRTC publish).
+      return;
     }
   }, [currentCall?.callId, currentCall?.status, roomNum, roomIntercomDevice]);
 
@@ -500,6 +501,10 @@ export function useGuestPbx() {
       const forceSpeaker = speakerOnRef.current;
       if (roomIntercomDeviceRef.current) {
         return resyncConnectedCallAudio(withMic, forceSpeaker);
+      }
+      if (!postVoiceAudioRoutedRef.current) {
+        postVoiceAudioRoutedRef.current = true;
+        routeCallAudio("connected", withMic, false);
       }
       return reassertConnectedCallAudio(withMic, forceSpeaker, true);
     }

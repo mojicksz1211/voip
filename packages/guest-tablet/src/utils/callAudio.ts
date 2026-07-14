@@ -118,8 +118,8 @@ export function enableSpeakerForCall(): void {
 const CONNECTED_AUDIO_REASSERT_MS = [0, 1000] as const;
 /** Phones: backup reassert only — immediate routing runs synchronously in reassertConnectedCallAudio. */
 const PHONE_CONNECTED_AUDIO_REASSERT_MS = [400] as const;
-/** Full routing resync after mic publish — light reassert is not enough on tablet + wired jack. */
-const CONNECTED_AUDIO_FULL_RESYNC_MS = [400, 1500, 3000] as const;
+/** Light reassert after voice connects — full prepare during WebRTC playback disconnects AAudio. */
+const CONNECTED_AUDIO_FULL_RESYNC_MS = [400, 1500] as const;
 
 let reassertGeneration = 0;
 let resyncGeneration = 0;
@@ -153,7 +153,7 @@ export function resyncConnectedCallAudio(withMic = false, forceSpeaker = false):
   const timers = CONNECTED_AUDIO_FULL_RESYNC_MS.map((delay) =>
     window.setTimeout(() => {
       if (generation !== resyncGeneration) return;
-      applyCallAudioState('connected', { withMic, forceSpeaker, reassertOnly: false });
+      applyCallAudioState('connected', { withMic, forceSpeaker, reassertOnly: true });
     }, delay),
   );
   return () => {

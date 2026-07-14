@@ -14,8 +14,9 @@ export interface DeviceInfo {
 }
 
 interface CallAudioPlugin {
+  hasProximitySensor(): Promise<{ supported: boolean }>;
   enableSpeaker(): Promise<void>;
-  routeCallAudio(options: { phase: CallAudioPhase; withMic?: boolean }): Promise<void>;
+  routeCallAudio(options: { phase: CallAudioPhase; withMic?: boolean; preferSpeaker?: boolean }): Promise<void>;
   applyCallState(options: {
     phase: CallAudioNativePhase;
     ringType?: NativeRingtoneType;
@@ -53,6 +54,17 @@ export const CallAudio = registerPlugin<CallAudioPlugin>('CallAudio');
 
 export const isAndroidNative =
   Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android';
+
+/** True on phones (proximity sensor); false on tablets used as desk intercom. */
+export async function hasProximitySensor(): Promise<boolean> {
+  if (!isAndroidNative) return false;
+  try {
+    const result = await CallAudio.hasProximitySensor();
+    return result.supported;
+  } catch {
+    return false;
+  }
+}
 
 /** Wait for LiveKit/WebRTC to release the communication device before hang-up PCM. */
 export const ANDROID_HANGUP_PLAY_DELAY_MS = 500;
@@ -219,16 +231,26 @@ export function enableSpeakerForCall(): void {
 
 /** Re-apply connected routing after LiveKit/WebRTC starts (can override AudioManager). */
 const CONNECTED_AUDIO_REASSERT_MS = [0, 1000] as const;
-/** Full routing resync after mic publish — light reassert is not enough on desk + wired jack. */
-const CONNECTED_AUDIO_FULL_RESYNC_MS = [400, 1500, 3000] as const;
+/** Phones: backup reassert only — immediate routing runs synchronously in reassertConnectedCallAudio. */
+const PHONE_CONNECTED_AUDIO_REASSERT_MS = [400] as const;
+/** Light reassert after voice connects — full prepare during WebRTC playback disconnects AAudio. */
+const CONNECTED_AUDIO_FULL_RESYNC_MS = [400, 1500] as const;
 
 let reassertGeneration = 0;
 let resyncGeneration = 0;
 
-export function reassertConnectedCallAudio(withMic = false, forceSpeaker = false): () => void {
+export function reassertConnectedCallAudio(
+  withMic = false,
+  forceSpeaker = false,
+  phoneEarpiece = false,
+): () => void {
   if (!isAndroidNative) return () => {};
+  if (phoneEarpiece && !forceSpeaker) {
+    applyCallAudioState('connected', { withMic, forceSpeaker, reassertOnly: true });
+  }
   const generation = ++reassertGeneration;
-  const timers = CONNECTED_AUDIO_REASSERT_MS.map((delay) =>
+  const delays = phoneEarpiece ? PHONE_CONNECTED_AUDIO_REASSERT_MS : CONNECTED_AUDIO_REASSERT_MS;
+  const timers = delays.map((delay) =>
     window.setTimeout(() => {
       if (generation !== reassertGeneration) return;
       applyCallAudioState('connected', { withMic, forceSpeaker, reassertOnly: true });
@@ -246,7 +268,7 @@ export function resyncConnectedCallAudio(withMic = false, forceSpeaker = false):
   const timers = CONNECTED_AUDIO_FULL_RESYNC_MS.map((delay) =>
     window.setTimeout(() => {
       if (generation !== resyncGeneration) return;
-      applyCallAudioState('connected', { withMic, forceSpeaker, reassertOnly: false });
+      applyCallAudioState('connected', { withMic, forceSpeaker, reassertOnly: true });
     }, delay),
   );
   return () => {

@@ -103,7 +103,7 @@ For guest tablets:
 
 ## Troubleshooting
 
-- If the PBX URL cannot connect, verify `npm run dev:all` is running on the Hotel PC.
+- If the PBX URL cannot connect, verify `npm run dev:all` is running on the Hotel PC and run `scripts/open-livekit-firewall.ps1` **as Administrator** (opens TCP **3000** for the API and LiveKit ports).
 - If the `100.x.x.x` URL cannot connect, verify Tailscale is connected on both devices.
 - If signaling works but voice does not, check Windows Firewall for LiveKit ports `7880`, `7881`, `7882/udp`, and `50000-50100/udp`.
 - If the wrong LiveKit URL is used, leave `LIVEKIT_WS_URL` unset so each client derives LiveKit from its own configured PBX URL.

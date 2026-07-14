@@ -68,23 +68,32 @@ final class CallAudioRouting {
             boolean forceSpeaker
     ) {
         audioManager.setMicrophoneMute(false);
-        audioManager.setBluetoothScoOn(false);
         audioManager.setMode(AudioManager.MODE_IN_COMMUNICATION);
 
-        if (preferWiredHeadset && routeToWiredHeadsetIfAvailable(audioManager)) {
-            clearForcedSpeakerRouting(audioManager);
-            audioManager.setSpeakerphoneOn(false);
-            return;
-        }
-
-        clearCommunicationDevice(audioManager);
-
         if (forceSpeaker) {
+            stopBluetoothScoIfActive(audioManager);
+            clearCommunicationDevice(audioManager);
             audioManager.setSpeakerphoneOn(true);
             forceAllStreamsToSpeaker(audioManager);
             routeOutputToBuiltInSpeaker(audioManager);
             return;
         }
+
+        if (preferWiredHeadset && routeToWiredHeadsetIfAvailable(audioManager)) {
+            stopBluetoothScoIfActive(audioManager);
+            clearForcedSpeakerRouting(audioManager);
+            audioManager.setSpeakerphoneOn(false);
+            return;
+        }
+
+        if (routeToBluetoothIfAvailable(audioManager)) {
+            clearForcedSpeakerRouting(audioManager);
+            audioManager.setSpeakerphoneOn(false);
+            return;
+        }
+
+        stopBluetoothScoIfActive(audioManager);
+        clearCommunicationDevice(audioManager);
 
         // Ring phase forces speaker via AudioSystem.setForceUse — must clear before earpiece.
         clearForcedSpeakerRouting(audioManager);
@@ -111,19 +120,39 @@ final class CallAudioRouting {
     }
 
     /**
-     * Front-desk tablet: without a wired jack, always use the built-in loudspeaker.
-     * Many tablets expose a fake earpiece route that is effectively silent.
+     * Connected-call routing for phones, tablets, wired retro handsets, and Bluetooth HFP.
+     *
+     * @return true when audio should use the built-in loudspeaker.
      */
+    static boolean computeEffectiveSpeaker(AudioManager audioManager, boolean forceSpeaker) {
+        if (forceSpeaker) {
+            return true;
+        }
+        if (isExternalAudioConnected(audioManager)) {
+            return false;
+        }
+        // Phones: earpiece. Tablets (no earpiece device): loudspeaker.
+        return !hasBuiltInEarpiece(audioManager);
+    }
+
+    static boolean isExternalAudioConnected(AudioManager audioManager) {
+        return isWiredHeadsetConnected(audioManager) || isBluetoothHfpConnected(audioManager);
+    }
+
     static void prepareDeskConnectedAudio(
             AudioManager audioManager,
             boolean preferWiredHeadset,
             boolean forceSpeaker
     ) {
-        if (!isWiredHeadsetConnected(audioManager)) {
+        if (isExternalAudioConnected(audioManager)) {
+            prepareConnectedAudio(audioManager, preferWiredHeadset, forceSpeaker);
+            return;
+        }
+        if (forceSpeaker || !hasBuiltInEarpiece(audioManager)) {
             prepareConnectedAudio(audioManager, preferWiredHeadset, true);
             return;
         }
-        prepareConnectedAudio(audioManager, preferWiredHeadset, forceSpeaker);
+        prepareConnectedAudio(audioManager, preferWiredHeadset, false);
     }
 
     /**
@@ -167,6 +196,22 @@ final class CallAudioRouting {
             return;
         }
 
+        if (isBluetoothHfpConnected(audioManager)) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                AudioDeviceInfo current = audioManager.getCommunicationDevice();
+                AudioDeviceInfo bluetooth = findBluetoothCommunicationDevice(audioManager);
+                if (bluetooth != null
+                        && (current == null || current.getId() != bluetooth.getId())) {
+                    audioManager.setCommunicationDevice(bluetooth);
+                }
+            } else if (!audioManager.isBluetoothScoOn()) {
+                routeToBluetoothIfAvailable(audioManager);
+            } else if (audioManager.isSpeakerphoneOn()) {
+                audioManager.setSpeakerphoneOn(false);
+            }
+            return;
+        }
+
         if (!hasBuiltInEarpiece(audioManager)) {
             if (!audioManager.isSpeakerphoneOn()) {
                 audioManager.setSpeakerphoneOn(true);
@@ -198,7 +243,7 @@ final class CallAudioRouting {
      */
     static void prepareHangupAudio(AudioManager audioManager, boolean wired) {
         audioManager.setMicrophoneMute(false);
-        audioManager.setBluetoothScoOn(false);
+        stopBluetoothScoIfActive(audioManager);
         if (wired) {
             audioManager.setMode(AudioManager.MODE_NORMAL);
             audioManager.setSpeakerphoneOn(false);
@@ -287,19 +332,69 @@ final class CallAudioRouting {
         }
     }
 
+    @SuppressWarnings("deprecation")
     static boolean isWiredHeadsetConnected(AudioManager audioManager) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            for (AudioDeviceInfo device : audioManager.getDevices(AudioManager.GET_DEVICES_OUTPUTS)) {
-                int type = device.getType();
-                if (type == AudioDeviceInfo.TYPE_WIRED_HEADSET
-                        || type == AudioDeviceInfo.TYPE_WIRED_HEADPHONES
-                        || type == AudioDeviceInfo.TYPE_USB_HEADSET) {
+        return findWiredCommunicationDevice(audioManager) != null;
+    }
+
+    /** Bluetooth HFP/SCO headset connected (voice-call profile only). */
+    static boolean isBluetoothHfpConnected(AudioManager audioManager) {
+        return findBluetoothCommunicationDevice(audioManager) != null;
+    }
+
+    static AudioDeviceInfo findBluetoothCommunicationDevice(AudioManager audioManager) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) {
+            return null;
+        }
+        for (AudioDeviceInfo device : audioManager.getDevices(AudioManager.GET_DEVICES_OUTPUTS)) {
+            if (device.getType() != AudioDeviceInfo.TYPE_BLUETOOTH_SCO) {
+                continue;
+            }
+            String product = safeProductName(device);
+            if (product != null && matchesLocalBuildIdentity(product)) {
+                continue;
+            }
+            return device;
+        }
+        return null;
+    }
+
+    static boolean routeToBluetoothIfAvailable(AudioManager audioManager) {
+        if (!isBluetoothHfpConnected(audioManager)) {
+            return false;
+        }
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            try {
+                AudioDeviceInfo bluetooth = findBluetoothCommunicationDevice(audioManager);
+                if (bluetooth != null && audioManager.setCommunicationDevice(bluetooth)) {
+                    audioManager.setSpeakerphoneOn(false);
                     return true;
                 }
+            } catch (SecurityException ignored) {
+                // BLUETOOTH_CONNECT may be denied on some builds.
             }
             return false;
         }
-        return audioManager.isWiredHeadsetOn();
+
+        audioManager.setSpeakerphoneOn(false);
+        if (!audioManager.isBluetoothScoOn()) {
+            audioManager.startBluetoothSco();
+            audioManager.setBluetoothScoOn(true);
+        }
+        return true;
+    }
+
+    static void stopBluetoothScoIfActive(AudioManager audioManager) {
+        if (!audioManager.isBluetoothScoOn()) {
+            return;
+        }
+        audioManager.setBluetoothScoOn(false);
+        try {
+            audioManager.stopBluetoothSco();
+        } catch (Exception ignored) {
+            // Best effort only.
+        }
     }
 
     private static boolean routeToWiredHeadsetIfAvailable(AudioManager audioManager) {
@@ -329,6 +424,22 @@ final class CallAudioRouting {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) {
             return null;
         }
+        AudioDeviceInfo external = findPreferredWiredDevice(audioManager, false);
+        if (external != null) {
+            return external;
+        }
+        // Some tablets (e.g. Lenovo TB336FU) expose the 3.5mm jack only as an OEM-internal
+        // USB headset node named after the device — filtered above to avoid phantom routing.
+        if (audioManager.isWiredHeadsetOn()) {
+            return findPreferredWiredDevice(audioManager, true);
+        }
+        return null;
+    }
+
+    private static AudioDeviceInfo findPreferredWiredDevice(
+            AudioManager audioManager,
+            boolean includeOemJackNodes
+    ) {
         int[] preferredTypes = {
                 AudioDeviceInfo.TYPE_WIRED_HEADSET,
                 AudioDeviceInfo.TYPE_USB_HEADSET,
@@ -336,12 +447,78 @@ final class CallAudioRouting {
         };
         for (int type : preferredTypes) {
             for (AudioDeviceInfo device : audioManager.getDevices(AudioManager.GET_DEVICES_OUTPUTS)) {
-                if (device.getType() == type) {
+                if (device.getType() != type) {
+                    continue;
+                }
+                if (includeOemJackNodes) {
+                    if (isLikelyOemWiredJackNode(device)) {
+                        return device;
+                    }
+                    continue;
+                }
+                if (isExternalWiredOutputDevice(device)) {
                     return device;
                 }
             }
         }
         return null;
+    }
+
+    private static boolean isLikelyOemWiredJackNode(AudioDeviceInfo device) {
+        if (device == null) {
+            return false;
+        }
+        int type = device.getType();
+        if (type == AudioDeviceInfo.TYPE_WIRED_HEADSET
+                || type == AudioDeviceInfo.TYPE_WIRED_HEADPHONES) {
+            return true;
+        }
+        if (type == AudioDeviceInfo.TYPE_USB_HEADSET) {
+            String product = safeProductName(device);
+            return product != null && matchesLocalBuildIdentity(product);
+        }
+        return false;
+    }
+
+    private static boolean isExternalWiredOutputDevice(AudioDeviceInfo device) {
+        if (device == null) {
+            return false;
+        }
+        String product = safeProductName(device);
+        if (product != null && matchesLocalBuildIdentity(product)) {
+            return false;
+        }
+        if (device.getType() == AudioDeviceInfo.TYPE_USB_HEADSET) {
+            return product != null && !product.isEmpty();
+        }
+        return true;
+    }
+
+    private static String safeProductName(AudioDeviceInfo device) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) {
+            return null;
+        }
+        try {
+            CharSequence name = device.getProductName();
+            return name != null ? name.toString().trim() : null;
+        } catch (Exception ignored) {
+            return null;
+        }
+    }
+
+    private static boolean matchesLocalBuildIdentity(String product) {
+        String p = product.trim();
+        if (p.isEmpty()) {
+            return false;
+        }
+        return equalsIgnoreCase(p, Build.MODEL)
+                || equalsIgnoreCase(p, Build.DEVICE)
+                || equalsIgnoreCase(p, Build.PRODUCT)
+                || equalsIgnoreCase(p, Build.MANUFACTURER);
+    }
+
+    private static boolean equalsIgnoreCase(String a, String b) {
+        return a != null && b != null && a.equalsIgnoreCase(b);
     }
 
     private static void routeOutputToBuiltInSpeaker(AudioManager audioManager) {
